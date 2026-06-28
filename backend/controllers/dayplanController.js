@@ -276,7 +276,7 @@ async function rebalanceDayPlan(req, res) {
       try {
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = gemini.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+        const model = gemini.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
         const list = ordered.slice(0, 6).map(t => `${t.taskName} (${t.cognitiveWeight}, ${t.status})`).join('; ');
         const prompt = `You are a focus coach. In ONE punchy sentence (max 22 words), explain why front-loading deep-focus work in the morning helps for this day. Tasks: ${list}. No preamble, just the sentence.`;
         const result = await model.generateContent(prompt);

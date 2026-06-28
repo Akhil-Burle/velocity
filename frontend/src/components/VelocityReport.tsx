@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronUp, ChevronDown, Coins, CheckCircle, Gauge, Clock, Flame, TrendingUp } from 'lucide-react';
 import { fetchWeeklyReport } from '../api';
 import type { WeeklyReport } from '../types';
+import { fmtHours } from '../data';
 
 interface VelocityReportProps {
   isDark?: boolean;
@@ -91,7 +92,7 @@ const VelocityReport: React.FC<VelocityReportProps> = ({ isDark = true }) => {
                           style={{ background: 'rgba(34,197,94,0.08)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.15)' }}>Live</span>
                       </div>
                       <div className="flex items-center gap-3 text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>
-                        <span className="flex items-center gap-1"><Clock size={11} style={{ color: '#f59e0b' }} /> {report.hoursLogged}h logged</span>
+                        <span className="flex items-center gap-1"><Clock size={11} style={{ color: '#f59e0b' }} /> {fmtHours(report.hoursLogged)} logged</span>
                         <span>{report.onPaceCount}/{report.activeCount} on pace</span>
                       </div>
                     </div>

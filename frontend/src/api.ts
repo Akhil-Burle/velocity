@@ -83,8 +83,29 @@ export async function loginWithCredentials(
 export async function submitBrainDump(text: string): Promise<Task[]> {
   return request<Task[]>('/braindump', {
     method: 'POST',
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({
+      text,
+      // Send local timezone offset so backend resolves "9pm today" correctly
+      tzOffsetMinutes: new Date().getTimezoneOffset(),
+    }),
   });
+}
+
+/** POST /api/tasks — manually create a task (no AI). Returns the new task with pace metrics. */
+export async function createTaskManual(data: {
+  taskName: string;
+  deadline: string;
+  taskType?: string;
+  cognitiveWeight?: string;
+  selfOwned?: boolean;
+  recipientName?: string;
+  completionPercent?: number;
+  energyLevel?: string;
+  estimatedDuration?: number;
+  driftExplanation?: string;
+  subtasks?: { title: string; estimatedMinutes: number }[];
+}): Promise<Task> {
+  return request<Task>('/tasks', { method: 'POST', body: JSON.stringify(data) });
 }
 
 /** GET /api/tasks — Fetch all stored tasks. */
@@ -105,16 +126,48 @@ export async function completeTask(id: string): Promise<{ task: Task; creditAwar
   return request(`/tasks/${id}/complete`, { method: 'POST' });
 }
 
-/** PATCH /api/tasks/:id/subtasks/:subtaskId — Mark a subtask complete/incomplete. */
+/** PATCH /api/tasks/:id/subtasks/:subtaskId — toggle completed, or update title/mins. Returns updated subtask + full updated task. */
 export async function updateSubtask(
   taskId: string,
   subtaskId: string,
-  completed: boolean
-): Promise<{ id: string; completed: boolean }> {
+  completed: boolean,
+): Promise<{ subtask: { id: string; completed: boolean }; task: Task }> {
   return request(`/tasks/${taskId}/subtasks/${subtaskId}`, {
     method: 'PATCH',
     body: JSON.stringify({ completed }),
   });
+}
+
+/** PATCH /api/tasks/:id/subtasks/:subtaskId — update title and/or estimatedMinutes */
+export async function editSubtask(
+  taskId: string,
+  subtaskId: string,
+  updates: { title?: string; estimatedMinutes?: number },
+): Promise<{ subtask: { id: string; title: string; estimatedMinutes: number }; task: Task }> {
+  return request(`/tasks/${taskId}/subtasks/${subtaskId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+}
+
+/** POST /api/tasks/:id/subtasks — add a new subtask */
+export async function addSubtask(
+  taskId: string,
+  title: string,
+  estimatedMinutes?: number,
+): Promise<{ subtask: { id: string; title: string; estimatedMinutes: number; completed: boolean }; task: Task }> {
+  return request(`/tasks/${taskId}/subtasks`, {
+    method: 'POST',
+    body: JSON.stringify({ title, estimatedMinutes }),
+  });
+}
+
+/** DELETE /api/tasks/:id/subtasks/:subtaskId — remove a subtask */
+export async function deleteSubtask(
+  taskId: string,
+  subtaskId: string,
+): Promise<{ task: Task }> {
+  return request(`/tasks/${taskId}/subtasks/${subtaskId}`, { method: 'DELETE' });
 }
 
 /** POST /api/checkins — Submit a check-in for a task. */
@@ -474,4 +527,101 @@ export interface ResultsData {
 /** GET /api/insights/results — impact evidence from agent log + task history. */
 export async function fetchResults(): Promise<ResultsData> {
   return request<ResultsData>('/insights/results');
+}
+
+// ─── Velocity Forecast Agent ──────────────────────────────────────────────────
+
+export interface TaskForecast {
+  taskId: string;
+  taskName: string;
+  probability: number;      // 0–100
+  trend: 'improving' | 'declining' | 'stable';
+  riskLevel: 'safe' | 'watch' | 'critical';
+  recovery: string | null;
+  trustDecay: number;       // % to drain from displayed progress (stale data)
+  daysToDeadline: number;
+  drift: number;
+  velocityRate: number;
+  requiredRate: number;
+  consistency: number;
+}
+
+export interface ForecastResult {
+  portfolioHealth: number;  // 0–100 weighted average finish probability
+  forecasts: TaskForecast[];
+  autonomousActions: Array<{
+    taskId: string;
+    taskName: string;
+    probability: number;
+    recovery: string;
+    logEntryId: string;
+  }>;
+  generatedAt: string;
+}
+
+/** POST /api/agent/forecast — run the proactive pace forecast agent. */
+export async function runForecast(): Promise<ForecastResult> {
+  return request<ForecastResult>('/agent/forecast', { method: 'POST' });
+}
+
+// ─── Behavioral Drift Score — Phase 1 ────────────────────────────────────────
+
+export interface DriftSignal {
+  subtask: number | null;  // subtask ratio inferred progress, or null
+  staleness: number;        // ≤ 0 adjustment from pace staleness
+  panic: number;            // ≤ 0 adjustment from Panic Mode usage
+  language: number;         // ±small from OmniBar language signal
+}
+
+export interface DriftScore {
+  taskId: string;
+  taskName: string;
+  inferredReal: number;   // 0–100 — our behavioral estimate of real progress
+  selfReported: number;   // 0–100 — what the user last reported
+  gap: number;            // inferredReal - selfReported (negative = user overreporting)
+  confidence: 'high' | 'medium' | 'low' | 'sparse';
+  signals: DriftSignal;
+  explanation: string[];
+}
+
+export interface VelocityVector {
+  magnitude: number;       // 0–100 how much is getting done
+  direction: 'good' | 'mixed' | 'poor'; // trajectory toward or away from deadlines
+  alignment: number;       // 0–100 how aligned real progress is with deadline requirements
+  worstOffenders: Array<{
+    taskId: string;
+    taskName: string;
+    driftGap: number;
+    probability: number;
+    status: string;
+    velocityRate: number;
+    requiredRate: number;
+  }>;
+}
+
+export interface DriftBatchResult {
+  driftScores: DriftScore[];
+  velocityVector: VelocityVector;
+  generatedAt: string;
+}
+
+/** POST /api/agent/drift-score — compute drift for one task */
+export async function computeDriftScore(taskId: string): Promise<DriftScore> {
+  return request<DriftScore>('/agent/drift-score', {
+    method: 'POST',
+    body: JSON.stringify({ taskId }),
+  });
+}
+
+/** POST /api/agent/drift-score-batch — compute drift for all active tasks + velocity vector */
+export async function computeDriftScoreBatch(): Promise<DriftBatchResult> {
+  return request<DriftBatchResult>('/agent/drift-score-batch', { method: 'POST' });
+}
+
+/** POST /api/agent/drift-signal — extract progress sentiment delta from an utterance */
+export async function extractDriftSignal(taskId: string | null, utterance: string): Promise<{ delta: number | null }> {
+  return request('/agent/drift-signal', {
+    method: 'POST',
+    body: JSON.stringify({ taskId, utterance }),
+  });
 }

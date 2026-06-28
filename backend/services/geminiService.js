@@ -27,7 +27,7 @@ function getModel() {
       const { VertexAI } = require('@google-cloud/vertexai');
       const vertexai = new VertexAI({ project: gcpProject, location: gcpLocation });
       _vertexModel = vertexai.getGenerativeModel({
-        model: 'gemini-2.5-flash-001',
+        model: 'gemini-2.5-flash',
         generationConfig: { maxOutputTokens: 8192 },
       });
       _usingVertex = true;
@@ -43,8 +43,8 @@ function getModel() {
       throw new Error('No AI backend configured: set GOOGLE_CLOUD_PROJECT (Vertex AI) or GEMINI_API_KEY');
     }
     const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    _devModel = gemini.getGenerativeModel({ model: 'gemini-2.5-flash' });
-    console.log('[GeminiService] Using Gemini Developer API (set GOOGLE_CLOUD_PROJECT to use Vertex AI)');
+    _devModel = gemini.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
+    console.log('[GeminiService] Using Gemini Developer API — gemini-3.1-flash-lite');
   }
   return { model: _devModel, isVertex: false };
 }
@@ -56,10 +56,23 @@ function getModel() {
  * non-streaming here so the shape is identical.
  */
 async function generate(promptOrParts) {
-  const { model } = getModel();
-  const result = await model.generateContent(promptOrParts);
-  // Both SDKs: result.response.text()
-  return result.response.text().trim();
+  const { model, isVertex } = getModel();
+  try {
+    const result = await model.generateContent(promptOrParts);
+    return result.response.text().trim();
+  } catch (err) {
+    // If Vertex AI fails (auth, model not found, quota), try falling back to Developer API
+    if (isVertex && process.env.GEMINI_API_KEY) {
+      console.warn('[GeminiService] Vertex AI failed, falling back to Developer API:', err.message);
+      _vertexModel = null; // reset so next call retries Vertex fresh
+      const { GoogleGenerativeAI } = require('@google/generative-ai');
+      const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const fallback = gemini.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
+      const result = await fallback.generateContent(promptOrParts);
+      return result.response.text().trim();
+    }
+    throw err;
+  }
 }
 
 /**
@@ -71,7 +84,7 @@ function getAIBackendInfo() {
     return {
       backend: 'vertex_ai',
       label: 'Vertex AI (Google Cloud)',
-      model: 'gemini-2.5-flash-001',
+      model: 'gemini-2.5-flash',
       project: gcpProject,
       location: process.env.GOOGLE_CLOUD_LOCATION || 'us-central1',
     };
@@ -79,7 +92,7 @@ function getAIBackendInfo() {
   return {
     backend: 'gemini_developer',
     label: 'Gemini Developer API',
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.1-flash-lite',
     project: null,
     location: null,
   };
@@ -106,26 +119,47 @@ function extractJSON(text) {
 
 // ─── 1. Brain Dump Extraction ─────────────────────────────────────────────────
 
-async function extractTasksFromBrainDump(text) {
-  const prompt = `Extract concrete tasks from this brain dump text. For each task, determine:
+async function extractTasksFromBrainDump(text, tzOffsetMinutes = 0) {
+  // Build a "local now" string so Gemini resolves times in the user's timezone
+  const nowUtc = new Date();
+  const localNow = new Date(nowUtc.getTime() - tzOffsetMinutes * 60000);
+  const localNowStr = localNow.toISOString().replace('Z', '') + (tzOffsetMinutes <= 0 ? `+${String(Math.abs(Math.floor(tzOffsetMinutes/60))).padStart(2,'0')}:${String(Math.abs(tzOffsetMinutes%60)).padStart(2,'0')}` : `-${String(Math.floor(Math.abs(tzOffsetMinutes)/60)).padStart(2,'0')}:${String(Math.abs(tzOffsetMinutes)%60).padStart(2,'0')}`);
+
+  const prompt = `Extract concrete tasks from this brain dump text. Today's local date and time for the user is: ${localNowStr}
+
+For each task, determine:
 - title: clear, actionable task name (string)
 - taskType: "code" | "document" | "diagram" | "other"
 - cognitiveWeight: "low" | "medium" | "high"
 - recipient: null or person's name (e.g., "Professor Smith", "Manager John", null for self-owned)
-- deadline: ISO datetime string (infer from context; if no deadline mentioned, use 7 days from now: ${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()})
+- deadline: ISO datetime string resolved in the user's LOCAL timezone shown above.
+  IMPORTANT RULES for deadline:
+  * "by 9pm today" → today's date at 21:00 local time → convert to UTC ISO string
+  * "tomorrow" with no time → tomorrow at 23:59 local time
+  * "Friday" → the coming Friday at 23:59 local time
+  * "end of week" → Sunday at 23:59 local time
+  * If deadline is explicitly stated (any time or date mentioned) → set deadlineExplicit to true
+  * If NO deadline is mentioned at all → set deadline to null and deadlineExplicit to false
+  * NEVER guess or assume a deadline if the user didn't mention one
+- deadlineExplicit: true if the user explicitly mentioned a date/time, false if you are guessing or there was none
 - subtasks: array of 2-5 objects with { title: string, estimatedMinutes: number }
 - driftExplanation: a brief sentence explaining the task's urgency or status
 
 Brain dump text:
 "${text}"
 
-Return ONLY a valid JSON array with 2-5 tasks. No markdown, no explanation, no code fences. Just the raw JSON array.`;
+Return ONLY a valid JSON array with 1-5 tasks. No markdown, no explanation, no code fences. Just the raw JSON array.`;
 
   const responseText = await generate(prompt);
   try {
     const tasks = extractJSON(responseText);
     if (!Array.isArray(tasks)) throw new Error('Gemini returned non-array response');
-    return tasks.slice(0, 5);
+    // Normalise: tasks with no explicit deadline get deadline=null and deadlineExplicit=false
+    return tasks.slice(0, 5).map(t => ({
+      ...t,
+      deadline: t.deadline || null,
+      deadlineExplicit: t.deadlineExplicit !== false, // default true if Gemini didn't set it
+    }));
   } catch (err) {
     console.error('[Gemini] Failed to parse brain dump response:', responseText);
     throw new Error(`Failed to parse Gemini response: ${err.message}`);
@@ -520,4 +554,5 @@ module.exports = {
   parseOmniBarIntent,
   parseOmniBarIntentLegacy,
   getAIBackendInfo,
+  generate, // exported for direct use by behavioral drift signal
 };

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, useDragControls } from 'framer-motion';
 import {
   Clock, Brain, TrendingUp, HelpCircle, X,
@@ -7,9 +7,12 @@ import {
 } from 'lucide-react';
 import { Task, PaceStatus, TaskType } from '../types';
 import PaceChart from './PaceChart';
-import { computePaceMetrics } from '../data';
-import TaskDetailModal from './TaskDetailModal';
-import { submitCheckIn } from '../api';
+import { computePaceMetrics, fmtHours } from '../data';
+import { submitCheckIn, computeDriftScore, DriftScore } from '../api';
+import DriftBadge from './DriftBadge';
+import DeadlinePhysics from './DeadlinePhysics';
+import TrustDecayBar from './TrustDecayBar';
+import InfoTooltip from './InfoTooltip';
 
 // ─── Status config ────────────────────────────────────────────────────────
 
@@ -21,7 +24,7 @@ const STATUS_CONFIG: Record<PaceStatus, {
   AMBER:   { accent: '#f59e0b', badgeBg: 'rgba(245,158,11,0.12)', badgeText: '#fbbf24', badgeBorder: 'rgba(245,158,11,0.3)',  label: 'Warning',       glowRgb: '245,158,11', progressGlow: 'rgba(245,158,11,0.5)' },
   RED:     { accent: '#ef4444', badgeBg: 'rgba(239,68,68,0.12)',  badgeText: '#f87171', badgeBorder: 'rgba(239,68,68,0.32)',  label: 'Critical',      glowRgb: '239,68,68',  progressGlow: 'rgba(239,68,68,0.5)'  },
   COMPLETE:{ accent: '#52525b', badgeBg: 'rgba(63,63,70,0.2)',    badgeText: '#71717a', badgeBorder: 'rgba(63,63,70,0.3)',   label: 'Complete',      glowRgb: '82,82,91',   progressGlow: 'rgba(82,82,91,0.3)'   },
-  failed:  { accent: '#71717a', badgeBg: 'rgba(63,63,70,0.15)',   badgeText: '#71717a', badgeBorder: 'rgba(63,63,70,0.25)',  label: 'Not Completed', glowRgb: '113,113,122',progressGlow: 'rgba(113,113,122,0.2)' },
+  failed:  { accent: '#71717a', badgeBg: 'rgba(63,63,70,0.15)',   badgeText: '#71717a', badgeBorder: 'rgba(63,63,70,0.25)',  label: 'Rescheduled', glowRgb: '113,113,122',progressGlow: 'rgba(113,113,122,0.2)' },
 };
 
 const WEIGHT_BADGE_DARK: Record<string, string> = {
@@ -51,24 +54,45 @@ interface TaskCardProps {
   onNegotiate?: () => void;
   onHotStart?: () => void;
   onMarkComplete?: () => void;
+  onMarkNotCompleted?: () => void;
   onProgressUpdate?: (percent: number) => void;
+  onTaskUpdate?: (updatedTask: Task) => void;
+  onOpenDetail?: (task: Task) => void;
   dragControls?: ReturnType<typeof useDragControls>;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────
 
 const TaskCard: React.FC<TaskCardProps> = ({
-  task, isHot, isDark = true, isRescheduled = false, onNegotiate, onHotStart, onMarkComplete, onProgressUpdate, dragControls,
+  task, isHot, isDark = true, isRescheduled = false, onNegotiate, onHotStart, onMarkComplete, onMarkNotCompleted, onProgressUpdate, onTaskUpdate, onOpenDetail, dragControls,
 }) => {
   const [whyOpen, setWhyOpen] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
   const [completingFlash, setCompletingFlash] = useState(false);
-  const [localProgress, setLocalProgress] = useState(task.completionPercent);
   const [hovered, setHovered] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  // Blocks the card's own onClick from opening the modal when an action button
-  // (Negotiate, Panic Mode) was just clicked.
+  const [driftScore, setDriftScore] = useState<DriftScore | null>(null);
   const actionClickedRef = useRef(false);
+
+  // Progress source: subtask ratio if subtasks exist, else manual completionPercent
+  const hasSubtasks = (task.subtasks?.length ?? 0) > 0;
+  const subtaskDrivenProgress = hasSubtasks
+    ? Math.round((task.subtasks!.filter(s => s.completed).length / task.subtasks!.length) * 100)
+    : null;
+  const [localProgress, setLocalProgress] = useState(
+    subtaskDrivenProgress !== null ? subtaskDrivenProgress : task.completionPercent
+  );
+
+  // Keep localProgress in sync when subtask ticks arrive from the modal
+  useEffect(() => {
+    if (subtaskDrivenProgress !== null) {
+      setLocalProgress(subtaskDrivenProgress);
+    }
+  }, [subtaskDrivenProgress]);
+
+  // Next incomplete subtask (shown on card when subtask-driven)
+  const nextSubtask = hasSubtasks
+    ? task.subtasks!.find(s => !s.completed) ?? null
+    : null;
 
   // Debounce ref for check-in sync
   const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -82,6 +106,14 @@ const TaskCard: React.FC<TaskCardProps> = ({
   const cfg = STATUS_CONFIG[task.status];
   const isComplete = task.status === 'COMPLETE';
   const showWhy = task.status === 'AMBER' || task.status === 'RED';
+
+  // Fetch drift score on mount (Phase 1) — passive, doesn't block render
+  useEffect(() => {
+    if (isComplete || task.isRescheduled) return;
+    computeDriftScore(task.id)
+      .then(score => setDriftScore(score))
+      .catch(() => {}); // silently fail — drift is supplementary
+  }, [task.id, isComplete, task.isRescheduled]);
   // Negotiate: visible for ANY external task (selfOwned=false) that's not complete — no status gate
   const showNeg = !task.selfOwned && !!task.recipientName && task.status !== 'COMPLETE' && task.status !== 'failed';
 
@@ -137,6 +169,13 @@ const TaskCard: React.FC<TaskCardProps> = ({
     setLocalProgress(val);
     onProgressUpdate?.(val);
     syncCheckIn(val);
+    // Auto-complete when slider reaches 100
+    if (val === 100 && !isComplete) {
+      setTimeout(() => {
+        setCompletingFlash(true);
+        setTimeout(() => { onMarkComplete?.(); setCompletingFlash(false); }, 700);
+      }, 300);
+    }
   };
 
   // Dynamic glow background follows cursor
@@ -178,7 +217,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
         onMouseLeave={handleMouseLeave}
         onClick={() => {
           if (actionClickedRef.current) { actionClickedRef.current = false; return; }
-          if (!isComplete) setModalOpen(true);
+          if (!isComplete) onOpenDetail?.(task);
         }}
         className="relative rounded-xl overflow-hidden"
       >
@@ -282,6 +321,10 @@ const TaskCard: React.FC<TaskCardProps> = ({
                   </AnimatePresence>
                 </motion.button>
               )}
+              {/* Drift badge (Phase 1) — show if we have a score */}
+              {!isComplete && driftScore && (
+                <DriftBadge drift={driftScore} isDark={isDark} />
+              )}
               <motion.span
                 className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
                 style={{ background: cfg.badgeBg, color: cfg.badgeText, border: `1px solid ${cfg.badgeBorder}` }}
@@ -333,9 +376,9 @@ const TaskCard: React.FC<TaskCardProps> = ({
                 <span className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>Required:</span>
                 <motion.span key={adjustedHours} initial={{ opacity: 0.5, y: -3 }} animate={{ opacity: 1, y: 0 }}
                   className="font-black font-mono text-base leading-none" style={{ color: cfg.accent }}>
-                  {isComplete ? '0.0' : adjustedHours}
+                  {isComplete ? '—' : fmtHours(adjustedHours)}
                 </motion.span>
-                <span className="text-[10px] font-mono" style={{ color: `${cfg.accent}88` }}>h/day</span>
+                <span className="text-[10px] font-mono" style={{ color: `${cfg.accent}88` }}>/day</span>
               </motion.div>
 
               <div className="flex items-center gap-1.5">
@@ -361,6 +404,10 @@ const TaskCard: React.FC<TaskCardProps> = ({
                     title="Syncing check-in..."
                   />
                 )}
+                <InfoTooltip
+                  size={10}
+                  explanation="Whether your actual completion % is ahead of or behind where it should be at this point in the task's timeline."
+                />
                 <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>
                   {isComplete ? 'done' : pace.drift >= 0 ? 'ahead' : 'behind'}
                 </span>
@@ -382,35 +429,116 @@ const TaskCard: React.FC<TaskCardProps> = ({
           {!isComplete && (
             <div className="mt-3">
               <PaceChart task={{ ...task, completionPercent: localProgress }} isDark={isDark} compact metrics={pace} />
+              {/* Deadline Physics curve (Phase 2) */}
+              <DeadlinePhysics
+                daysToDeadline={pace.daysToDeadline}
+                requiredRate={pace.requiredRate}
+                velocityRate={pace.velocityRate}
+                status={task.status}
+                completionPercent={localProgress}
+                isDark={isDark}
+              />
             </div>
           )}
 
-          {/* Progress log slider — available on every active task */}
+          {/* Progress section — subtask-driven OR manual slider */}
           {!isComplete && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-              className="mt-3 pt-3 overflow-hidden relative" style={{ borderTop: `1px solid ${dividerColor}` }}>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] font-mono" style={{ color: 'var(--text-faint)' }}>Progress Log</span>
-                <motion.span key={`${localProgress}-${pace.requiredHoursPerDay}`}
-                  initial={{ opacity: 0.5, x: 4 }} animate={{ opacity: 1, x: 0 }}
-                  className="font-mono text-[11px] font-semibold" style={{ color: cfg.accent }}>
-                  {localProgress}% — {pace.requiredHoursPerDay}h/day to finish
-                </motion.span>
-              </div>
-              <div className="relative">
-                <input type="range" min={0} max={100} value={localProgress} onChange={handleSlider}
-                  onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}
-                  className="w-full velocity-slider"
-                  style={{ '--slider-accent': cfg.accent } as React.CSSProperties} />
-                {/* Inline hint — always correct, no portal positioning needed */}
-                <span style={{
-                  position: 'absolute', right: 0, top: -16,
-                  fontSize: 8, fontFamily: 'JetBrains Mono, monospace',
-                  color: `${cfg.accent}70`, pointerEvents: 'none', whiteSpace: 'nowrap',
-                }}>
-                  drag to log progress · syncs trust score
-                </span>
-              </div>
+              className="mt-3 pt-3 overflow-hidden" style={{ borderTop: `1px solid ${dividerColor}` }}>
+
+              {hasSubtasks ? (
+                /* ── Subtask-driven — locked bar + next subtask chip ── */
+                <div>
+                  {/* Header row */}
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-mono" style={{ color: 'var(--text-faint)' }}>Progress</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full"
+                        style={{ background: `rgba(${cfg.glowRgb},0.1)`, color: cfg.accent, border: `1px solid rgba(${cfg.glowRgb},0.18)` }}>
+                        {task.subtasks!.filter(s => s.completed).length}/{task.subtasks!.length} subtasks
+                      </span>
+                    </div>
+                    <motion.span key={localProgress} initial={{ opacity: 0.5, x: 4 }} animate={{ opacity: 1, x: 0 }}
+                      className="font-mono text-[11px] font-semibold" style={{ color: cfg.accent }}>
+                      {localProgress}%
+                    </motion.span>
+                  </div>
+
+                  {/* Locked progress bar */}
+                  <div className="h-1.5 rounded-full overflow-hidden mb-2.5"
+                    style={{ background: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }}>
+                    <motion.div className="h-full rounded-full"
+                      animate={{ width: `${localProgress}%` }}
+                      transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+                      style={{ background: `linear-gradient(90deg,${cfg.accent}88,${cfg.accent})`,
+                        boxShadow: `0 0 6px ${cfg.accent}60` }} />
+                  </div>
+
+                  {/* Next incomplete subtask */}
+                  {nextSubtask ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
+                        border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}` }}
+                      onClick={e => { e.stopPropagation(); onOpenDetail?.(task); }}
+                      title="Open task to tick subtasks"
+                    >
+                      {/* Empty checkbox */}
+                      <div className="w-3.5 h-3.5 rounded-full shrink-0 flex items-center justify-center"
+                        style={{ border: `1.5px solid rgba(${cfg.glowRgb},0.4)`, background: 'transparent' }} />
+                      <span className="flex-1 text-[11px] font-mono truncate" style={{ color: 'var(--text-secondary)' }}>
+                        {nextSubtask.title}
+                      </span>
+                      {nextSubtask.estimatedMinutes > 0 && (
+                        <span className="text-[9px] font-mono shrink-0" style={{ color: 'var(--text-faint)' }}>
+                          ~{nextSubtask.estimatedMinutes}m
+                        </span>
+                      )}
+                    </motion.div>
+                  ) : (
+                    /* All subtasks done */
+                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
+                      style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.18)' }}>
+                      <span className="text-[10px] font-mono" style={{ color: '#4ade80' }}>
+                        ✓ All subtasks complete — mark task done
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* ── Manual slider — no subtasks ── */
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-mono" style={{ color: 'var(--text-faint)' }}>Progress Log</span>
+                    <motion.span key={`${localProgress}-${pace.requiredHoursPerDay}`}
+                      initial={{ opacity: 0.5, x: 4 }} animate={{ opacity: 1, x: 0 }}
+                      className="font-mono text-[11px] font-semibold" style={{ color: cfg.accent }}>
+                      {localProgress}% — {fmtHours(pace.requiredHoursPerDay)}/day to finish
+                    </motion.span>
+                  </div>
+                  <TrustDecayBar
+                    selfReported={localProgress}
+                    expectedProgress={pace.expected}
+                    lastCheckInAt={
+                      task.sparkline && task.sparkline.length > 0
+                        ? [...task.sparkline].filter(p => p.timestamp).sort((a, b) =>
+                            new Date(b.timestamp!).getTime() - new Date(a.timestamp!).getTime()
+                          )[0]?.timestamp || null
+                        : null
+                    }
+                    trustDecay={Math.min(40, Math.max(0, localProgress - pace.expected))}
+                    status={task.status}
+                    isDark={isDark}
+                  />
+                  <div className="relative mt-1">
+                    <input type="range" min={0} max={100} value={localProgress} onChange={handleSlider}
+                      onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}
+                      className="w-full velocity-slider"
+                      style={{ '--slider-accent': cfg.accent } as React.CSSProperties} />
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -428,6 +556,25 @@ const TaskCard: React.FC<TaskCardProps> = ({
                 }}>
                 <MessageSquare size={10} />
                 Negotiate with {task.recipientName}
+              </motion.button>
+            </div>
+          )}
+
+          {/* Completed — option to move back to active / reschedule */}
+          {isComplete && onMarkNotCompleted && (
+            <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${dividerColor}` }}>
+              <motion.button
+                onClick={e => { e.stopPropagation(); onMarkNotCompleted(); }}
+                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                className="w-full flex items-center justify-center gap-2 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
+                style={{
+                  background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
+                  border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)',
+                  color: 'var(--text-faint)',
+                }}
+              >
+                <X size={10} />
+                Reschedule
               </motion.button>
             </div>
           )}
@@ -471,19 +618,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
         </div>
       </motion.div>
 
-      {/* Detail modal */}
-      <AnimatePresence>
-        {modalOpen && (
-          <TaskDetailModal
-            task={{ ...task, completionPercent: localProgress, currentPaceHoursPerDay: isComplete ? 0 : adjustedHours }}
-            isDark={isDark}
-            onClose={() => setModalOpen(false)}
-            onMarkComplete={() => { setModalOpen(false); onMarkComplete?.(); }}
-            onProgressUpdate={val => { setLocalProgress(val); onProgressUpdate?.(val); }}
-            onNegotiate={() => onNegotiate?.()}
-            onHotStart={() => { setModalOpen(false); onHotStart?.(); }} />
-        )}
-      </AnimatePresence>
+      {/* Detail modal is rendered at Dashboard level — see onOpenDetail prop */}
     </>
   );
 };

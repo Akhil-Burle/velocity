@@ -18,6 +18,7 @@ import {
 import { useTheme } from '../ThemeContext';
 import { fetchAgentLog, undoAgentLogEntry, undoChainStep, fetchPolicyMemory } from '../api';
 import type { AgentLogEntry, ChainStep, PolicyMemoryEntry } from '../types';
+import InfoTooltip from './InfoTooltip';
 
 // ── Feature metadata ─────────────────────────────────────────────────────────
 const FEATURE_META: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -553,16 +554,19 @@ const StatsBar: React.FC<{ entries: AgentLogEntry[]; isDark: boolean; surfaceBg:
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
       {[
-        { label: 'Total Actions',    value: String(entries.length), color: 'var(--text-primary)' },
-        { label: 'Fully Autonomous', value: String(autonomous),     color: '#ef4444' },
-        { label: 'Action Chains',    value: String(chains),         color: '#818cf8' },
-        { label: 'Features Active',  value: String(features),       color: '#22c55e' },
-      ].map(({ label, value, color }, i) => (
+        { label: 'Total Actions',    value: String(entries.length), color: 'var(--text-primary)', tooltip: null },
+        { label: 'Fully Autonomous', value: String(autonomous),     color: '#ef4444', tooltip: 'Actions Velocity took entirely on its own without prompting — no user input required to trigger or complete them.' },
+        { label: 'Action Chains',    value: String(chains),         color: '#818cf8', tooltip: 'Multi-step sequences where one autonomous action triggered follow-on actions — Velocity reasoning across multiple features at once.' },
+        { label: 'Features Active',  value: String(features),       color: '#22c55e', tooltip: null },
+      ].map(({ label, value, color, tooltip }, i) => (
         <motion.div key={label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.06 }}
           className="rounded-xl p-3.5"
           style={{ background: surfaceBg, border: `1px solid ${surfaceBorder}` }}>
-          <div className="text-[10px] font-mono uppercase tracking-wider mb-1" style={{ color: 'var(--text-faint)' }}>{label}</div>
+          <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider mb-1" style={{ color: 'var(--text-faint)' }}>
+            {label}
+            {tooltip && <InfoTooltip explanation={tooltip} />}
+          </div>
           <div className="font-bold font-mono text-2xl" style={{ color }}>{value}</div>
         </motion.div>
       ))}

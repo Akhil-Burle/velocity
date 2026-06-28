@@ -123,28 +123,18 @@ const EntryPoint: React.FC<EntryPointProps> = ({ onSubmit }) => {
   const [loading, setLoading]         = useState(false);
   const [hintValue, setHintValue]     = useState('');
   const [pendingText, setPendingText] = useState<string | null>(null);
-  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // ── Preserved handlers ────────────────────────────────────────────────────
   const handleSubmit = (text: string) => {
     if (loading) return;
     if (!isAuthenticated) {
+      // Silently run the cinematic demo login, then submit the text
       setPendingText(text);
-      setShowAuthModal(true);
+      handleDemoSandboxWithCallback(text);
       return;
     }
     setLoading(true);
     setTimeout(() => onSubmit(text), 1400);
-  };
-
-  const handleAuthenticated = () => {
-    setShowAuthModal(false);
-    if (pendingText) {
-      setLoading(true);
-      const text = pendingText;
-      setPendingText(null);
-      setTimeout(() => onSubmit(text), 1400);
-    }
   };
 
   const [cinematicLogin, setCinematicLogin] = useState(false);
@@ -152,14 +142,9 @@ const EntryPoint: React.FC<EntryPointProps> = ({ onSubmit }) => {
   const [typedUser, setTypedUser] = useState('');
   const [typedPass, setTypedPass] = useState('');
 
-  // Demo Sandbox — cinematic auto-login sequence when not authenticated
-  const handleDemoSandbox = () => {
+  // Runs the cinematic login, then fires submitText once authenticated
+  const handleDemoSandboxWithCallback = (submitText?: string) => {
     if (loading) return;
-    if (isAuthenticated) {
-      setLoading(true);
-      setTimeout(() => onSubmit(''), 800);
-      return;
-    }
 
     // Cinematic sequence: type "demo" + "velocity2026" → login
     setCinematicLogin(true);
@@ -202,12 +187,19 @@ const EntryPoint: React.FC<EntryPointProps> = ({ onSubmit }) => {
                     setTimeout(() => {
                       setCinematicLogin(false);
                       setLoading(true);
-                      setTimeout(() => onSubmit(''), 400);
+                      setTimeout(() => onSubmit(submitText ?? ''), 400);
                     }, 700);
                   } catch {
-                    // Fallback: open auth modal
+                    // Demo login failed — fall back to guest session, then proceed
+                    try {
+                      const { guestLogin } = await import('../api');
+                      const guest = await guestLogin();
+                      setApiToken(guest.token);
+                      setAuth(guest.token, guest.userId, 'guest');
+                    } catch { /* backend fully unreachable */ }
                     setCinematicLogin(false);
-                    setShowAuthModal(true);
+                    setLoading(true);
+                    setTimeout(() => onSubmit(submitText ?? ''), 400);
                   }
                 }, 600);
               }
@@ -216,6 +208,16 @@ const EntryPoint: React.FC<EntryPointProps> = ({ onSubmit }) => {
         }
       }, 20);
     }, 600);
+  };
+
+  // Original sandbox button handler — no pending text, goes straight to dashboard
+  const handleDemoSandbox = () => {
+    if (isAuthenticated) {
+      setLoading(true);
+      setTimeout(() => onSubmit(''), 800);
+      return;
+    }
+    handleDemoSandboxWithCallback();
   };
 
   const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.09, delayChildren: 0.1 } } };
@@ -779,16 +781,6 @@ const EntryPoint: React.FC<EntryPointProps> = ({ onSubmit }) => {
               </div>
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Auth modal ────────────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {showAuthModal && (
-          <AuthModal
-            onClose={() => { setShowAuthModal(false); setPendingText(null); }}
-            onAuthenticated={handleAuthenticated}
-          />
         )}
       </AnimatePresence>
 

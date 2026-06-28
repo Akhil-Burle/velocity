@@ -73,7 +73,7 @@ function createTask(data) {
   const cognitiveWeight = (data.cognitiveWeight || 'medium').toUpperCase();
   const recipientName = data.recipient || null;
   const selfOwned = !recipientName;
-  const deadline = data.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const deadline = data.deadline || null; // null = user hasn't confirmed yet
   const currentPaceHoursPerDay = calcRequiredHoursPerDay(cognitiveWeight, deadline);
   const status = derivePaceStatus(currentPaceHoursPerDay);
   const subtasks = (data.subtasks || []).map(createSubtask);

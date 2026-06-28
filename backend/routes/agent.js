@@ -8,10 +8,22 @@ const {
   handleOmniParse,
   handleOmniExecute,
 } = require('../controllers/agentController');
+const { handleForecast } = require('../controllers/forecastController');
 const { synthesizeSpeech, isTTSConfigured } = require('../services/ttsService');
+const {
+  handleDriftScore,
+  handleDriftScoreBatch,
+  handleDriftSignal,
+} = require('../controllers/behavioralDriftController');
 
 router.post('/panic-scaffold', handlePanicScaffold);
 router.post('/omni-parse',     handleOmniParse);
+router.post('/forecast',       handleForecast);
+
+// ── Behavioral Drift Score — Phase 1 ──────────────────────────────────────────
+router.post('/drift-score',       handleDriftScore);
+router.post('/drift-score-batch', handleDriftScoreBatch);
+router.post('/drift-signal',      handleDriftSignal);
 
 /**
  * POST /api/agent/omni-execute

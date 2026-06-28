@@ -129,6 +129,76 @@ async function autoSeedIfEmpty(userId) {
   console.log(`[DemoMode] Auto-seeded ${tasks.length} pace-realistic tasks for: ${userId}`);
 }
 
+// ─── POST /api/tasks ──────────────────────────────────────────────────────────
+// Manual task creation — no AI, instant, all fields explicit.
+
+async function createTask(req, res) {
+  const userId = req.userId;
+  const {
+    taskName, deadline, taskType = 'OTHER', cognitiveWeight = 'MEDIUM',
+    selfOwned = true, recipientName = null,
+    completionPercent = 0, energyLevel = '', estimatedDuration = 60,
+    driftExplanation = '', subtasks = [],
+  } = req.body;
+
+  if (!taskName || !taskName.trim()) {
+    return res.status(400).json({ error: 'taskName is required' });
+  }
+  if (!deadline) {
+    return res.status(400).json({ error: 'deadline is required' });
+  }
+
+  const { v4: uuidv4 } = require('uuid');
+  const now = new Date().toISOString();
+
+  const raw = {
+    userId,
+    id: uuidv4(),
+    taskName: taskName.trim(),
+    deadline,
+    taskType: ['CODE', 'WRITING', 'DIAGRAM', 'OTHER'].includes(taskType) ? taskType : 'OTHER',
+    cognitiveWeight: ['LOW', 'MEDIUM', 'HIGH'].includes(cognitiveWeight) ? cognitiveWeight : 'MEDIUM',
+    selfOwned: Boolean(selfOwned),
+    recipientName: selfOwned ? null : (recipientName || null),
+    completionPercent: Math.max(0, Math.min(100, Number(completionPercent) || 0)),
+    energyLevel: ['Deep Focus', 'Quick Wins', 'Brain-Dead', ''].includes(energyLevel) ? energyLevel : '',
+    estimatedDuration: Math.max(1, Number(estimatedDuration) || 60),
+    driftExplanation: driftExplanation || '',
+    hotStartContent: '', negotiatedDraft: '',
+    isRescheduled: false,
+    rawInput: `[manual] ${taskName.trim()}`,
+    sparkline: completionPercent > 0
+      ? [{ value: Number(completionPercent), timestamp: now }]
+      : [],
+    subtasks: (subtasks || []).map((s, i) => ({
+      id: uuidv4(),
+      title: String(s.title || `Step ${i + 1}`).trim(),
+      estimatedMinutes: Math.max(1, Number(s.estimatedMinutes) || 30),
+      scheduledSlot: null,
+      completed: Boolean(s.completed),
+    })),
+    panicScaffold: { checklist: [], boilerplate: '', repoUrl: '', generatedAt: '' },
+    mode: 'normal',
+    createdAt: now,
+    updatedAt: now,
+    creditsAwarded: false,
+  };
+
+  raw.creditValue = computeTaskCredits(raw);
+  const metrics = computePaceMetrics(raw);
+  raw.currentPaceHoursPerDay = metrics.requiredHoursPerDay;
+  raw.status = raw.completionPercent >= 100 ? 'COMPLETE' : metrics.status;
+
+  if (isConnected()) {
+    await TaskModel.create(raw);
+    const { _id, __v, ...cleaned } = raw;
+    return res.status(201).json(decorateTask(cleaned));
+  }
+
+  db.addTask ? db.addTask(raw) : null;
+  return res.status(201).json(decorateTask(raw));
+}
+
 // ─── GET /api/tasks ───────────────────────────────────────────────────────────
 
 async function getAllTasks(req, res) {
@@ -137,7 +207,34 @@ async function getAllTasks(req, res) {
   if (isConnected()) {
     await autoSeedIfEmpty(userId);
     const tasks = await TaskModel.find({ userId }).sort({ deadline: 1 }).lean();
-    return res.json(tasks.map(({ _id, __v, ...t }) => decorateTask(t)));
+
+    // Auto-reschedule any task whose deadline has passed but is still active
+    // (not complete, not already rescheduled). Sets isRescheduled: true and
+    // pushes the deadline forward by the same original span so pace adapts.
+    const now = Date.now();
+    const toReschedule = tasks.filter(t =>
+      !t.isRescheduled &&
+      t.status !== 'COMPLETE' &&
+      t.status !== 'failed' &&
+      new Date(t.deadline).getTime() < now &&
+      (t.completionPercent || 0) < 100
+    );
+
+    if (toReschedule.length > 0) {
+      await Promise.all(toReschedule.map(t =>
+        TaskModel.findOneAndUpdate(
+          { id: t.id, userId },
+          { $set: { isRescheduled: true, updatedAt: new Date(now).toISOString() } }
+        ).catch(() => {})
+      ));
+    }
+
+    // Re-fetch after any auto-reschedule mutations
+    const fresh = toReschedule.length > 0
+      ? await TaskModel.find({ userId }).sort({ deadline: 1 }).lean()
+      : tasks;
+
+    return res.json(fresh.map(({ _id, __v, ...t }) => decorateTask(t)));
   }
 
   const tasks = [...db.getAllTasks()].sort(
@@ -168,8 +265,8 @@ async function updateTask(req, res) {
     updates.updatedAt = new Date().toISOString();
     let updated = await TaskModel.findOneAndUpdate({ id, userId }, { $set: updates }, { new: true, lean: true });
 
-    // Recompute pace status from the fresh state (unless explicitly completed/failed)
-    if (updated.status !== 'COMPLETE' && updated.status !== 'failed') {
+    // Recompute pace status from the fresh state (unless explicitly completed)
+    if (updated.status !== 'COMPLETE') {
       const m = computePaceMetrics(updated);
       updated = await TaskModel.findOneAndUpdate(
         { id, userId },
@@ -190,7 +287,7 @@ async function updateTask(req, res) {
     updates.sparkline = [...current, { value: updates.completionPercent, timestamp: new Date().toISOString() }].slice(-30);
   }
   let updated = db.updateTask(id, updates);
-  if (updated.status !== 'COMPLETE' && updated.status !== 'failed') {
+  if (updated.status !== 'COMPLETE') {
     const m = computePaceMetrics(updated);
     updated = db.updateTask(id, { status: m.status, currentPaceHoursPerDay: m.requiredHoursPerDay });
   }
@@ -234,4 +331,4 @@ async function completeTask(req, res) {
   return res.json({ task: decorateTask(updated), creditAward: award });
 }
 
-module.exports = { getAllTasks, updateTask, completeTask };
+module.exports = { getAllTasks, createTask, updateTask, completeTask };

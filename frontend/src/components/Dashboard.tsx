@@ -3,22 +3,25 @@ import { motion, AnimatePresence, Reorder, useInView, useDragControls } from 'fr
 import { useNavigate } from 'react-router-dom';
 import {
   Zap, FastForward, CheckCircle, ChevronRight,
-  RefreshCw, TrendingUp, Clock, LayoutGrid, AlertTriangle,
+  RefreshCw, TrendingUp, Clock, LayoutGrid, AlertTriangle, Plus,
 } from 'lucide-react';import { Task, PaceStatus } from '../types';
 
 // OS-aware keyboard shortcut label
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 const KBD_LABEL = IS_MAC ? '⌘K' : 'Ctrl+K';
-import { calcRequiredHoursPerDay, derivePaceStatus, computePaceMetrics } from '../data';
+import { calcRequiredHoursPerDay, derivePaceStatus, computePaceMetrics, fmtHours } from '../data';
 import { useTheme } from '../ThemeContext';
 import { useCredits } from '../CreditsContext';
 import TaskCard from './TaskCard';
 import HotStartPanel from './HotStartPanel';
 import NegotiateModal from './NegotiateModal';
+import TaskDetailModal from './TaskDetailModal';
+import CreateTaskModal from './CreateTaskModal';
 import VelocityReport from './VelocityReport';
 import SkeletonCard from './SkeletonCard';
 import BrainDumpInput from './BrainDumpInput';
 import BurnoutChart from './BurnoutChart';
+import ForecastPanel from './ForecastPanel';
 import OmniBar from './OmniBar';
 import {
   submitBrainDump,
@@ -36,7 +39,10 @@ import PanicModePanel from './PanicModePanel';
 import GuidedTour from './GuidedTour';
 import StartHereCard from './StartHereCard';
 import CountdownToast from './CountdownToast';
+import { useToast } from './Toast';
+import DeadlineConfirmModal from './DeadlineConfirmModal';
 import type { TourStep } from './GuidedTour';
+import InfoTooltip from './InfoTooltip';
 
 interface DashboardProps { brainDumpText?: string; }
 interface NegotiateTarget { taskId: string; taskName: string; recipientName: string; draft: string; }
@@ -101,18 +107,6 @@ const StatChip: React.FC<{ value: string; label: string; color: string; pulse?: 
   </motion.div>
 );
 
-// ── Error toast ───────────────────────────────────────────────────────────────
-const ErrorToast: React.FC<{ message: string; isDark: boolean; onDismiss: () => void }> = ({ message, isDark, onDismiss }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }}
-    className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl max-w-md"
-    style={{ background: isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', backdropFilter: 'blur(12px)' }}>
-    <AlertTriangle size={14} className="text-red-400 shrink-0" />
-    <span className="text-xs font-mono text-red-400">{message}</span>
-    <button onClick={onDismiss} className="ml-2 text-red-400 opacity-60 hover:opacity-100 text-xs">✕</button>
-  </motion.div>
-);
-
 // ── DraggableTaskCard — wraps Reorder.Item with per-card drag controls ────────
 // dragControls lets the user drag only by the GripVertical handle, not the whole card.
 interface DraggableTaskCardProps {
@@ -124,15 +118,16 @@ interface DraggableTaskCardProps {
   onHotStart: () => void;
   onMarkComplete: () => void;
   onProgressUpdate: (pct: number) => void;
+  onTaskUpdate: (updated: Task) => void;
+  onOpenDetail: (task: Task) => void;
 }
 const DraggableTaskCard: React.FC<DraggableTaskCardProps> = ({
-  task, idx, fastForwarded, isDark, onNegotiate, onHotStart, onMarkComplete, onProgressUpdate,
+  task, idx, fastForwarded, isDark, onNegotiate, onHotStart, onMarkComplete, onProgressUpdate, onTaskUpdate, onOpenDetail,
 }) => {
   const controls = useDragControls();
   return (
     <Reorder.Item key={task.id} value={task} as="div" dragListener={false} dragControls={controls}>
       <motion.div
-        // Mark first card for the tour
         data-tour={idx === 0 ? 'tour-task-card' : undefined}
         initial={{ opacity: 0, y: 20, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, scale: 0.92, y: -10 }}
@@ -145,6 +140,8 @@ const DraggableTaskCard: React.FC<DraggableTaskCardProps> = ({
           onHotStart={onHotStart}
           onMarkComplete={onMarkComplete}
           onProgressUpdate={onProgressUpdate}
+          onTaskUpdate={onTaskUpdate}
+          onOpenDetail={onOpenDetail}
           dragControls={controls}
         />
       </motion.div>
@@ -158,6 +155,7 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
   const isDark = theme === 'dark';
   const navigate = useNavigate();
   const { award } = useCredits();
+  const { addToast } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -166,7 +164,6 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
   const [negotiateTarget, setNegotiateTarget] = useState<NegotiateTarget | null>(null);
   const [sentEmails, setSentEmails] = useState<Set<string>>(new Set());
   const [fastForwarded, setFastForwarded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [triageLoading, setTriageLoading] = useState(false);
   const [negotiateLoading, setNegotiateLoading] = useState(false);
   const [entryLoading, setEntryLoading] = useState(false);
@@ -175,11 +172,14 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
   const [panicState, setPanicState]     = useState<PanicState | null>(null);
   // OmniBar state
   const [omniBarOpen, setOmniBarOpen]   = useState(false);
-  // Toast state for velocity degradation
-  const [velocityToast, setVelocityToast] = useState<string | null>(null);
+  const [forecastHealth, setForecastHealth] = useState<number | null>(null);
+  const [pendingDeadlineTasks, setPendingDeadlineTasks] = useState<Task[]>([]);
   // Pending triage — shows a countdown toast before actually applying the reschedule
   const [pendingTriage, setPendingTriage] = useState<{ taskId: string; taskName: string } | null>(null);
   const prevStatusRef = useRef<Record<string, PaceStatus>>({});
+  // Detail modal — lifted to Dashboard level so Reorder re-renders never close it
+  const [detailTask, setDetailTask] = useState<Task | null>(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   // ── Tour target refs ───────────────────────────────────────────────────────
   const [tourDone, setTourDone] = useState(false);
@@ -265,7 +265,7 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load tasks';
-      setError(`Backend error: ${msg}. Is the backend deployed and reachable?`);
+      addToast({ type: 'error', message: `${msg}. Is the backend reachable?`, duration: 6000 });
       setTasks([]);
     } finally {
       setTimeout(() => setLoading(false), SKELETON_MS);
@@ -277,14 +277,14 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
   }, [brainDumpText]);
 
   const activeTasks     = tasks.filter(t => !t.isRescheduled && t.status !== 'COMPLETE' && t.status !== 'failed');
-  const rescheduledTasks= tasks.filter(t => t.isRescheduled);
+  const rescheduledTasks= tasks.filter(t => t.isRescheduled || t.status === 'failed'); // failed tasks fold into rescheduled
   const completedTasks  = tasks.filter(t => t.status === 'COMPLETE');
-  const failedTasks     = tasks.filter(t => t.status === 'failed');
   const onPaceCount = activeTasks.filter(t => t.status === 'GREEN').length;
   const criticalCount = activeTasks.filter(t => t.status === 'RED').length;
   const warningCount = activeTasks.filter(t => t.status === 'AMBER').length;
-  const avgHours = activeTasks.length > 0
-    ? (activeTasks.reduce((s, t) => s + t.currentPaceHoursPerDay, 0) / activeTasks.length).toFixed(1) : '0.0';
+  const avgHoursRaw = activeTasks.length > 0
+    ? activeTasks.reduce((s, t) => s + t.currentPaceHoursPerDay, 0) / activeTasks.length : 0;
+  const avgHours = fmtHours(avgHoursRaw);
   // Real velocity score — blend of on-pace ratio + steadiness across active tasks
   const velocityScoreNum = activeTasks.length > 0
     ? Math.round(activeTasks.reduce((s, t) => {
@@ -294,11 +294,13 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
       }, 0) / activeTasks.length)
     : 0;
   const velocityScore = activeTasks.length > 0 ? String(velocityScoreNum) : '—';
-  const velocityColor = velocityScoreNum >= 70 ? '#22c55e' : velocityScoreNum >= 50 ? '#f59e0b' : '#ef4444';
+  const velocityColor = activeTasks.length === 0
+    ? 'var(--text-faint)'
+    : velocityScoreNum >= 70 ? '#22c55e' : velocityScoreNum >= 50 ? '#f59e0b' : '#ef4444';
 
   const recalcTelemetry = useCallback((list: Task[]): Task[] =>
     list.map(t => {
-      if (t.status === 'COMPLETE' || t.status === 'failed' || t.isRescheduled) return t;
+      if (t.status === 'COMPLETE' || t.isRescheduled) return t;
       const m = computePaceMetrics(t);
       return { ...t, currentPaceHoursPerDay: m.requiredHoursPerDay, status: m.status, paceMetrics: m };
     }), []);
@@ -308,10 +310,15 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
     setEntryLoading(true);
     try {
       const newTasks = await submitBrainDump(text);
-      setTasks(prev => [...prev, ...newTasks]);
+      // Split: tasks with confirmed deadlines go straight to board,
+      // tasks without confirmed deadlines go to the deadline picker
+      const confirmed   = newTasks.filter(t => t.deadlineExplicit !== false && t.deadline);
+      const unconfirmed = newTasks.filter(t => t.deadlineExplicit === false || !t.deadline);
+      if (confirmed.length > 0) setTasks(prev => [...prev, ...confirmed]);
+      if (unconfirmed.length > 0) setPendingDeadlineTasks(unconfirmed);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to add task';
-      setError(`Quick Entry: ${msg}`);
+      addToast({ type: 'error', message: `Quick Entry: ${msg}` });
     } finally {
       setEntryLoading(false);
     }
@@ -336,14 +343,12 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
 
   const handleMarkComplete = async (taskId: string) => {
     setHotStartTask(null); setHotStartContent('');
-    // Optimistic UI
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'COMPLETE' as PaceStatus } : t));
+    // Optimistic UI — mark complete and clear rescheduled flag so it moves to Completed section
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'COMPLETE' as PaceStatus, isRescheduled: false } : t));
     try {
       const { creditAward } = await apiCompleteTask(taskId);
       if (creditAward && creditAward.credits > 0) {
         award('task_complete', creditAward.credits);
-        setVelocityToast(`◆ +${creditAward.credits} VC — ${creditAward.reason}`);
-        setTimeout(() => setVelocityToast(null), 4500);
       }
     } catch {
       // Fall back to a plain status update if the complete endpoint fails
@@ -373,7 +378,7 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
         ));
         award('panic_resolved');
       } catch (err: unknown) {
-        setError(`Panic Mode: ${err instanceof Error ? err.message : 'Scaffold failed'}`);
+        addToast({ type: 'error', message: `Panic Mode: ${err instanceof Error ? err.message : 'Scaffold failed'}` });
         setPanicState(null);
       }
     } else {
@@ -385,7 +390,7 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
         setHotStartContent(result.scaffold);
         setTasks(prev => prev.map(t => t.id === task.id ? { ...t, hotStartContent: result.scaffold } : t));
       } catch (err: unknown) {
-        setError(`Hot-Start: ${err instanceof Error ? err.message : 'Hot-start failed'}`);
+        addToast({ type: 'error', message: `Hot-Start: ${err instanceof Error ? err.message : 'Hot-start failed'}` });
       }
     }
   };
@@ -402,7 +407,9 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, negotiatedDraft: result.message } : t));
       setNegotiateTarget({ taskId: task.id, taskName: task.taskName, recipientName: task.recipientName, draft: result.message });
     } catch (err: unknown) {
-      setError(`Negotiate: ${err instanceof Error ? err.message : 'Failed to generate draft'}`);
+      const msg = err instanceof Error ? err.message : 'Failed to generate draft';
+      console.error('[Negotiate] Error:', msg);
+      addToast({ type: 'error', message: `Negotiate: ${msg}` });
     } finally {
       setNegotiateLoading(false);
     }
@@ -429,10 +436,10 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
         // Phase 2: show countdown toast — act after window, not immediately
         setPendingTriage({ taskId: result.triagedTask.id, taskName: result.triagedTask.taskName });
       } else {
-        setError(`Triage: ${result.reason}`);
+        addToast({ type: 'info', message: `Triage: ${result.reason}` });
       }
     } catch (err: unknown) {
-      setError(`Triage: ${err instanceof Error ? err.message : 'Triage failed'}`);
+      addToast({ type: 'error', message: `Triage: ${err instanceof Error ? err.message : 'Triage failed'}` });
     } finally {
       setTriageLoading(false);
     }
@@ -440,7 +447,9 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
 
   const handleUltimatumResolved = (losingTask: Task, _winningTask: Task, _confirmation: string) => {
     setUltimatum(null);
-    setTasks(prev => prev.map(t => t.id === losingTask.id ? { ...t, status: 'failed' as const } : t));
+    // The losing task gets rescheduled — the user made a conscious call to defer it,
+    // not abandon it. "Not Completed" is reserved for tasks that hit their deadline untouched.
+    setTasks(prev => prev.map(t => t.id === losingTask.id ? { ...t, isRescheduled: true } : t));
   };
 
   const handleUltimatumEscape = () => {
@@ -462,21 +471,16 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
 
   // ── Auto-recalc telemetry every 60s — real-time drift detection ─────────────
   useEffect(() => {
-    // On first load: if any active task is already RED, show an immediate
-    // velocity degradation alert after a short delay (so the dashboard renders first)
+    // On first load: snapshot statuses — do NOT toast on initial RED tasks.
+    // We only want to notify when a task *degrades* during the session.
     const initialTimer = setTimeout(() => {
       setTasks(prev => {
         const updated = recalcTelemetry(prev);
-        const redTask = updated.find(t => t.status === 'RED' && !t.isRescheduled && t.status !== 'COMPLETE');
-        if (redTask) {
-          setVelocityToast(`⚡ ${redTask.taskName.slice(0, 30)} is in critical velocity — act now`);
-          setTimeout(() => setVelocityToast(null), 5000);
-        }
-        // Snapshot initial statuses
+        // Just snapshot statuses — no toast on load
         updated.forEach(t => { prevStatusRef.current[t.id] = t.status; });
         return updated;
       });
-    }, 3500); // fire 3.5s after dashboard loads
+    }, 3500);
 
     const interval = setInterval(() => {
       setTasks(prev => {
@@ -488,8 +492,7 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
               (prevStatus === 'GREEN' && (t.status === 'AMBER' || t.status === 'RED')) ||
               (prevStatus === 'AMBER' && t.status === 'RED');
             if (degraded) {
-              setVelocityToast(`⚡ ${t.taskName.slice(0, 30)} velocity degraded to ${t.status}`);
-              setTimeout(() => setVelocityToast(null), 4000);
+              addToast({ type: 'warning', message: `${t.taskName.slice(0, 35)} degraded to ${t.status}`, duration: 4000 });
             }
           }
           prevStatusRef.current[t.id] = t.status;
@@ -531,8 +534,8 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
 
   const STATS = [
     { icon: LayoutGrid,  label: 'Active Tasks',   value: loading ? '—' : String(activeTasks.length),    color: 'var(--text-primary)' },
-    { icon: Clock,       label: 'Avg hrs/day',     value: loading ? '—' : `${avgHours}h`,                color: '#f59e0b' },
-    { icon: TrendingUp,  label: 'Velocity Score',  value: loading ? '—' : velocityScore,                 color: velocityColor },
+    { icon: Clock,       label: 'Avg/day',        value: loading ? '—' : avgHours,                     color: '#f59e0b' },
+    { icon: TrendingUp,  label: 'Portfolio Health', value: loading ? '—' : forecastHealth !== null ? `${forecastHealth}%` : `${velocityScore}`, color: forecastHealth !== null ? (forecastHealth >= 70 ? '#22c55e' : forecastHealth >= 50 ? '#f59e0b' : '#ef4444') : velocityColor },
     { icon: CheckCircle, label: 'Completed',        value: loading ? '—' : String(completedTasks.length), color: '#22c55e' },
   ];
 
@@ -603,6 +606,17 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
                 </motion.div>
               )}
             </AnimatePresence>
+            {/* Create Task button */}
+            <motion.button
+              onClick={() => setCreateModalOpen(true)}
+              whileHover={{ scale: 1.04, boxShadow: '0 0 16px rgba(34,197,94,0.25)' }}
+              whileTap={{ scale: 0.96 }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold"
+              style={{ background: 'rgba(34,197,94,0.1)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.28)' }}
+            >
+              <Plus size={12} />
+              <span className="hidden sm:inline">New Task</span>
+            </motion.button>
           </div>
           <div className="flex items-center gap-2">
             {/* Triage button */}
@@ -656,6 +670,12 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
               <div className="flex items-center gap-1.5 mb-1.5">
                 <Icon size={11} style={{ color: 'var(--text-faint)' }} />
                 <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>{label}</span>
+                {label === 'Portfolio Health' && (
+                  <InfoTooltip explanation="Likelihood all active tasks finish on time — weighted across deadlines. See the Forecast panel below for per-task breakdown." />
+                )}
+                {label === 'Avg/day' && (
+                  <InfoTooltip explanation="Average hours per day required across all active tasks to reach their deadlines at current pace." />
+                )}
               </div>
               <div className="font-bold font-mono text-2xl" style={{ color }}>
                 {loading
@@ -667,12 +687,23 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
           ))}
         </div>
 
-        {/* Burnout Horizon Chart */}
+        {/* Burnout Horizon — compact collapsible widget */}
         {!loading && activeTasks.length > 0 && (
-          <motion.div data-tour="tour-burnout" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.4 }} className="mb-6">
-            <BurnoutChart tasks={tasks} isDark={isDark} onTriggerTriage={handleTriage} />
-          </motion.div>
+          <BurnoutChart tasks={tasks} isDark={isDark} onTriggerTriage={handleTriage} />
+        )}
+
+        {/* Velocity Forecast Agent */}
+        {!loading && activeTasks.length > 0 && (
+          <ForecastPanel
+            isDark={isDark}
+            surfaceBorder={surfaceBorder}
+            taskCount={activeTasks.length}
+            onHealthUpdate={setForecastHealth}
+            onAutonomousAction={() => {
+              // Nudge user toward Agent Log when proactive alerts fire
+              addToast({ type: 'info', message: 'Agent logged proactive drift alerts → Agent Log', duration: 5000 });
+            }}
+          />
         )}
 
         {/* Active tasks */}
@@ -711,29 +742,13 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
                   onHotStart={() => handleOpenHotStart(task)}
                   onMarkComplete={() => handleMarkComplete(task.id)}
                   onProgressUpdate={pct => setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completionPercent: pct } : t))}
+                  onTaskUpdate={updated => setTasks(prev => prev.map(t => t.id === updated.id ? { ...t, ...updated } : t))}
+                  onOpenDetail={task => setDetailTask(task)}
                 />
               ))}
             </AnimatePresence>
           </Reorder.Group>
         )}
-
-        {/* Completed */}
-        <AnimatePresence>
-          {completedTasks.length > 0 && (
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.4 }} className="mt-10">
-              <SectionDivider label="Completed" count={completedTasks.length} dimmed isDark={isDark} />
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-                {completedTasks.map((task, idx) => (
-                  <motion.div key={task.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: idx * 0.05 }}>
-                    <TaskCard task={task} isDark={isDark} />
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Rescheduled */}
         <AnimatePresence>
@@ -745,7 +760,9 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
                 {rescheduledTasks.map((task, idx) => (
                   <motion.div key={task.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.06, duration: 0.4 }}>
-                    <TaskCard task={task} isDark={isDark} isRescheduled onMarkComplete={() => handleMarkComplete(task.id)} />
+                    <TaskCard task={task} isDark={isDark} isRescheduled
+                      onMarkComplete={() => handleMarkComplete(task.id)}
+                      onNegotiate={() => handleOpenNegotiate(task)} />
                   </motion.div>
                 ))}
               </div>
@@ -753,20 +770,23 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
           )}
         </AnimatePresence>
 
-        {/* Not Completed (Ultimatum failures) */}
+        {/* Completed */}
         <AnimatePresence>
-          {failedTasks.length > 0 && (
+          {completedTasks.length > 0 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.4 }} className="mt-10">
-              <SectionDivider label="Not Completed" count={failedTasks.length} dimmed accent="#ef4444" isDark={isDark} />
+              <SectionDivider label="Completed" count={completedTasks.length} dimmed isDark={isDark} />
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-                {failedTasks.map((task, idx) => (
-                  <motion.div key={task.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.06, duration: 0.4 }}>
-                    {/* Failed status has its own STATUS_CONFIG entry — no spoofing needed */}
-                    <div style={{ opacity: 0.65 }}>
-                      <TaskCard task={task} isDark={isDark} />
-                    </div>
+                {completedTasks.map((task, idx) => (
+                  <motion.div key={task.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: idx * 0.05 }}>
+                    <TaskCard
+                      task={task}
+                      isDark={isDark}
+                      onMarkNotCompleted={() => setTasks(prev => prev.map(t =>
+                        t.id === task.id ? { ...t, isRescheduled: true, status: 'GREEN' as const, completionPercent: t.completionPercent < 100 ? t.completionPercent : 0 } : t
+                      ))}
+                    />
                   </motion.div>
                 ))}
               </div>
@@ -862,32 +882,6 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
         )}
       </AnimatePresence>
 
-      {/* Velocity degradation toast */}
-      <AnimatePresence>
-        {velocityToast && (
-          <motion.div
-            key="vel-toast"
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl max-w-md"
-            style={{
-              background: isDark ? 'rgba(245,158,11,0.12)' : 'rgba(245,158,11,0.08)',
-              border: '1px solid rgba(245,158,11,0.3)',
-              backdropFilter: 'blur(12px)',
-            }}
-          >
-            <AlertTriangle size={14} className="text-amber-400 shrink-0" />
-            <span className="text-xs font-mono text-amber-400">{velocityToast}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Error toast */}
-      <AnimatePresence>
-        {error && <ErrorToast key="err" message={error} isDark={isDark} onDismiss={() => setError(null)} />}
-      </AnimatePresence>
-
       {/* OmniBar — CMD+K command palette */}
       <OmniBar
         isOpen={omniBarOpen}
@@ -903,8 +897,7 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
           if (intent === 'smart_routing' && result?.topTask) {
             const top = result.topTask as { id?: string; taskName?: string };
             if (top?.taskName) {
-              setVelocityToast(`📍 Top priority: ${top.taskName.slice(0, 40)}`);
-              setTimeout(() => setVelocityToast(null), 5000);
+              addToast({ type: 'info', message: `Top priority: ${top.taskName.slice(0, 40)}`, duration: 5000 });
             }
           }
         }}
@@ -916,6 +909,73 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
       {!tourDone && (
         <GuidedTour steps={TOUR_STEPS} onDone={() => setTourDone(true)} startDelay={2000} />
       )}
+
+      {/* Deadline confirmation modal — for tasks Gemini couldn't date */}
+      <AnimatePresence>
+        {pendingDeadlineTasks.length > 0 && (
+          <DeadlineConfirmModal
+            key="deadline-confirm"
+            tasks={pendingDeadlineTasks}
+            isDark={isDark}
+            onConfirm={confirmed => {
+              setTasks(prev => [...prev, ...confirmed]);
+              setPendingDeadlineTasks([]);
+            }}
+            onDismiss={() => {
+              // Add with a 7-day fallback deadline so they still land on the board
+              const withFallback = pendingDeadlineTasks.map(t => ({
+                ...t,
+                deadline: t.deadline || new Date(Date.now() + 7 * 86400000).toISOString(),
+              }));
+              setTasks(prev => [...prev, ...withFallback]);
+              setPendingDeadlineTasks([]);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Create Task modal */}
+      <AnimatePresence>
+        {createModalOpen && (
+          <CreateTaskModal
+            key="create-task"
+            isDark={isDark}
+            onClose={() => setCreateModalOpen(false)}
+            onCreated={newTask => {
+              setTasks(prev => [newTask, ...prev]);
+              addToast({ type: 'success', message: `"${newTask.taskName}" added to your board`, duration: 3000 });
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Task detail modal — rendered at Dashboard level so Reorder re-renders never unmount it */}
+      <AnimatePresence>
+        {detailTask && (
+          <TaskDetailModal
+            key={detailTask.id}
+            task={detailTask}
+            isDark={isDark}
+            onClose={() => setDetailTask(null)}
+            onMarkComplete={() => { handleMarkComplete(detailTask.id); setDetailTask(null); }}
+            onProgressUpdate={val => {
+              setTasks(prev => prev.map(t => t.id === detailTask.id ? { ...t, completionPercent: val } : t));
+            }}
+            onTaskUpdate={updated => {
+              setTasks(prev => prev.map(t => t.id === updated.id ? { ...t, ...updated } : t));
+              setDetailTask(updated); // keep modal in sync without closing
+            }}
+            onNegotiate={() => {
+              const t = tasks.find(x => x.id === detailTask.id);
+              if (t) handleOpenNegotiate(t);
+            }}
+            onHotStart={() => {
+              const t = tasks.find(x => x.id === detailTask.id);
+              if (t) { setDetailTask(null); handleOpenHotStart(t); }
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

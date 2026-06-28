@@ -38,7 +38,7 @@ const useCountUp = (target: number, duration = 700) => {
 const CreditsTicker: React.FC<{ isDark: boolean; surfaceBorder: string }> = ({ isDark, surfaceBorder }) => {
   const { profile, burst, leveledUp } = useCredits();
   const navigate = useNavigate();
-  const credits = useCountUp(profile?.credits ?? 0);
+  const credits = useCountUp(profile?.credits ?? 0, 900);
 
   if (!profile) return null;
 
@@ -87,7 +87,10 @@ const CreditsTicker: React.FC<{ isDark: boolean; surfaceBorder: string }> = ({ i
       <div className="flex flex-col items-start leading-none">
         <div className="flex items-center gap-1">
           <Zap size={10} style={{ color: '#22c55e' }} />
-          <span className="text-xs font-mono font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
+          <span
+            className="text-xs font-mono font-bold tabular-nums"
+            style={{ color: burst ? '#4ade80' : 'var(--text-primary)', transition: 'color 0.3s ease' }}
+          >
             {credits.toLocaleString()}
           </span>
           <span className="text-[9px] font-mono" style={{ color: 'var(--text-faint)' }}>VC</span>
@@ -110,23 +113,46 @@ const CreditsTicker: React.FC<{ isDark: boolean; surfaceBorder: string }> = ({ i
         </div>
       )}
 
-      {/* +VC burst — floats down from below the widget */}
+      {/* +VC burst — rises up INTO the credit number then vanishes */}
       <AnimatePresence>
         {burst && (
           <motion.div
             key={burst.id}
-            initial={{ opacity: 0, y: 4, scale: 0.85 }}
-            animate={{ opacity: 1, y: 16, scale: 1 }}
-            exit={{ opacity: 0, y: 28, scale: 0.9 }}
-            transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute top-full left-1/2 -translate-x-1/2 pointer-events-none whitespace-nowrap mt-1"
+            initial={{ opacity: 0, y: 8, scale: 0.75 }}
+            animate={{ opacity: [0, 1, 1, 0], y: [8, 0, -8, -20], scale: [0.75, 1.1, 1, 0.9] }}
+            transition={{ duration: 1.2, times: [0, 0.2, 0.7, 1], ease: 'easeOut' }}
+            className="absolute pointer-events-none whitespace-nowrap"
             style={{
-              fontSize: 11, fontFamily: 'JetBrains Mono, monospace', fontWeight: 700,
-              color: '#22c55e', textShadow: '0 0 12px rgba(34,197,94,0.6)',
+              // Position it over the credits number
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              fontSize: 12,
+              fontFamily: 'JetBrains Mono, monospace',
+              fontWeight: 800,
+              color: '#4ade80',
+              textShadow: '0 0 14px rgba(34,197,94,0.9), 0 0 30px rgba(34,197,94,0.4)',
+              zIndex: 20,
+              letterSpacing: '-0.01em',
             }}
           >
             +{burst.amount} VC
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Glow pulse on the counter when burst fires */}
+      <AnimatePresence>
+        {burst && (
+          <motion.div
+            key={`glow-${burst.id}`}
+            className="absolute inset-0 rounded-full pointer-events-none"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 0.6, 0] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.9, ease: 'easeOut' }}
+            style={{ background: 'radial-gradient(ellipse at 50% 50%, rgba(34,197,94,0.25) 0%, transparent 70%)' }}
+          />
         )}
       </AnimatePresence>
     </motion.button>

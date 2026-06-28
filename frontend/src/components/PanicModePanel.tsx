@@ -22,6 +22,7 @@ import {
   FileCode, ListChecks, Brain, ArrowRight,
 } from 'lucide-react';
 import { Task } from '../types';
+import { fmtHours } from '../data';
 
 interface PanicModePanelProps {
   task: Task;
@@ -319,7 +320,7 @@ const PanicModePanel: React.FC<PanicModePanelProps> = ({
               border: isCritical ? '1px solid rgba(239,68,68,0.22)' : '1px solid rgba(245,158,11,0.22)',
             }}>
             <Clock size={9} className="inline mr-1" />
-            {hoursUntil < 1 ? `${Math.round(hoursUntil * 60)}m` : `${hoursUntil.toFixed(1)}h`} left
+            {hoursUntil < 1 ? `${Math.round(hoursUntil * 60)}m` : fmtHours(hoursUntil)} left
           </span>
           {!loading && (
             <motion.button onClick={handleCopy} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
@@ -440,7 +441,7 @@ const PanicModePanel: React.FC<PanicModePanelProps> = ({
                 style={{ background: whyBg, borderTop: `1px solid ${whyBorder}` }}>
                 <span style={{ color: 'var(--text-faint)' }}>// Velocity Zero-Hour · Autonomous trigger{'\n'}</span>
                 <span style={{ color: 'var(--text-secondary)' }}>
-                  Deadline in <span className="text-red-400 font-bold">{hoursUntil.toFixed(1)}h</span>.
+                  Deadline in <span className="text-red-400 font-bold">{fmtHours(hoursUntil)}</span>.
                   Velocity crossed the 24h threshold and acted <span className="text-green-400">without waiting for you to ask</span> —
                   generating checklist, boilerplate{repoUrl ? ', and GitHub repo' : ''} in one shot.
                   This action is logged in the Agent Log with full reasoning.

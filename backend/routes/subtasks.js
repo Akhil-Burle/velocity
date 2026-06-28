@@ -1,11 +1,12 @@
 /**
  * routes/subtasks.js
- * PATCH /api/tasks/:id/subtasks/:subtaskId
  */
 const express = require('express');
 const router = express.Router({ mergeParams: true });
-const { updateSubtask } = require('../controllers/subtasksController');
+const { updateSubtask, addSubtask, deleteSubtask } = require('../controllers/subtasksController');
 
-router.patch('/:subtaskId', updateSubtask);
+router.post('/',              addSubtask);
+router.patch('/:subtaskId',   updateSubtask);
+router.delete('/:subtaskId',  deleteSubtask);
 
 module.exports = router;

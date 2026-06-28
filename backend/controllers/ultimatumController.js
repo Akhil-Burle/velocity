@@ -155,18 +155,19 @@ async function resolve(req, res) {
       return res.status(404).json({ error: 'One or both tasks not found for this user' });
     }
 
-    // Mark the loser as "failed" — NOT rescheduled, NOT recoverable via normal triage
+    // Mark the loser as rescheduled — the user made a conscious choice to defer it.
+    // It's not abandoned — it should be picked up later with an adapted deadline.
     let updatedLoser;
     if (isConnected()) {
       const raw = await TaskModel.findOneAndUpdate(
         { id: losingTaskId, userId },
-        { $set: { status: 'failed', isRescheduled: false, updatedAt: new Date().toISOString() } },
+        { $set: { isRescheduled: true, updatedAt: new Date().toISOString() } },
         { new: true, lean: true }
       );
       const { _id, __v, ...cleaned } = raw;
       updatedLoser = cleaned;
     } else {
-      updatedLoser = db.updateTask(losingTaskId, { status: 'failed', isRescheduled: false });
+      updatedLoser = db.updateTask(losingTaskId, { isRescheduled: true });
     }
 
     // Log the decision
@@ -189,14 +190,14 @@ async function resolve(req, res) {
       }
     }
 
-    console.log(`[Ultimatum] ${userId} chose "${winnerTask.taskName}" over "${loserTask.taskName}" — "${loserTask.taskName}" marked failed.`);
+    console.log(`[Ultimatum] ${userId} chose "${winnerTask.taskName}" over "${loserTask.taskName}" — "${loserTask.taskName}" rescheduled.`);
 
     return res.json({
       success: true,
       losingTask: updatedLoser,
       winningTask: winnerTask,
       reasoning,
-      confirmation: `"${loserTask.taskName}" marked as not completing. "${winnerTask.taskName}" remains your priority.`,
+      confirmation: `"${loserTask.taskName}" rescheduled — adapt its deadline and pick it up later. "${winnerTask.taskName}" is your priority now.`,
     });
   } catch (err) {
     console.error('[Ultimatum] resolve error:', err);

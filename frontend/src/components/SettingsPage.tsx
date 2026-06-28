@@ -6,12 +6,14 @@
  */
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import {
   Settings, Clock, Mail, Bell, Moon, Zap, RefreshCw,
-  CheckCircle2, ToggleLeft, ToggleRight, Palette, Calendar,
+  CheckCircle2, ToggleLeft, ToggleRight, Palette, Calendar, LogOut,
 } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
-import { fetchSettings, updateSettings } from '../api';
+import { useAuth } from '../AuthContext';
+import { fetchSettings, updateSettings, setApiToken } from '../api';
 import type { Settings as SettingsType } from '../types';
 
 // ── Toggle switch component — based on exact ToggleRight icon pattern ─────────
@@ -80,6 +82,8 @@ const Section: React.FC<{ icon: React.ReactNode; title: string; children: React.
 const SettingsPage: React.FC = () => {
   const { theme, toggle } = useTheme();
   const isDark = theme === 'dark';
+  const { logout } = useAuth();
+  const navigate = useNavigate();
 
   const [settings, setSettings] = useState<SettingsType | null>(null);
   const [saving, setSaving] = useState(false);
@@ -118,6 +122,12 @@ const SettingsPage: React.FC = () => {
       setTimeout(() => setSaved(false), 2500);
     } catch { setError('Could not save — backend may not be running.'); setTimeout(() => setError(null), 3000); }
     finally { setSaving(false); }
+  };
+
+  const handleLogout = () => {
+    logout();           // clears localStorage token + nulls api token
+    setApiToken(null);  // belt-and-suspenders clear in api module
+    navigate('/');
   };
 
   if (!settings) {
@@ -224,6 +234,29 @@ const SettingsPage: React.FC = () => {
                 </motion.button>
               ))}
             </div>
+          </div>
+        </Section>
+
+        {/* Session */}
+        <Section icon={<LogOut size={13} />} title="Session" surfaceBg={surfaceBg} surfaceBorder={surfaceBorder} divider={divider}>
+          <div className="py-3.5 flex items-center justify-between">
+            <div>
+              <div className="text-xs font-semibold mb-0.5" style={{ color: 'var(--text-secondary)' }}>Sign out</div>
+              <div className="text-[11px] font-mono" style={{ color: 'var(--text-faint)' }}>Clears your session and returns to the landing page</div>
+            </div>
+            <motion.button
+              onClick={handleLogout}
+              whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold shrink-0"
+              style={{
+                background: 'rgba(239,68,68,0.08)',
+                border: '1px solid rgba(239,68,68,0.25)',
+                color: '#f87171',
+              }}
+            >
+              <LogOut size={13} />
+              Log out
+            </motion.button>
           </div>
         </Section>
 

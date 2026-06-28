@@ -1,17 +1,19 @@
 /**
  * BurnoutChart.tsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Feature Block 3: Burnout Horizon Chart — 14-day workload projection.
- * Uses Recharts AreaChart. Auto-triggers triage when capacity exceeded today.
+ * Burnout Horizon — compact collapsible widget.
+ * Collapsed: single status row (urgent alert if burning today).
+ * Expanded:  full 14-day area chart.
  */
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, CartesianGrid,
   Tooltip, ReferenceLine, ReferenceArea,
 } from 'recharts';
-import { Zap, AlertTriangle } from 'lucide-react';
+import { Zap, AlertTriangle, ChevronDown } from 'lucide-react';
 import { Task } from '../types';
+import InfoTooltip from './InfoTooltip';
 
 interface BurnoutChartProps {
   tasks: Task[];
@@ -37,32 +39,28 @@ function buildBurnoutData(tasks: Task[]): BurnoutDataPoint[] {
     const dayLabel = idx === 0 ? 'Today' : idx === 1 ? 'Tmrw' :
       new Date(dayMs).toLocaleDateString('en', { weekday: 'short', month: 'numeric', day: 'numeric' }).replace(',', '');
 
-    const available = HOURS_PER_DAY;
-
-    // Sum required hours for tasks that haven't hit their deadline yet at this day
     const required = activeTasks.reduce((sum, task) => {
       const deadlineMs = new Date(task.deadline).getTime();
-      if (deadlineMs > dayMs) {
-        return sum + (task.currentPaceHoursPerDay || 0);
-      }
-      return sum;
+      return deadlineMs > dayMs ? sum + (task.currentPaceHoursPerDay || 0) : sum;
     }, 0);
 
     return {
       day: dayLabel,
-      available: Math.round(available * 10) / 10,
+      available: HOURS_PER_DAY,
       required: Math.round(required * 10) / 10,
-      burnout: required > available,
+      burnout: required > HOURS_PER_DAY,
       idx,
     };
   });
 }
 
 const BurnoutChart: React.FC<BurnoutChartProps> = ({ tasks, isDark = true, onTriggerTriage }) => {
+  const [expanded, setExpanded] = useState(false);
   const data = useMemo(() => buildBurnoutData(tasks), [tasks]);
   const isBurningToday = data[0]?.burnout ?? false;
+  const burnoutDays = data.filter(d => d.burnout).length;
+  const todayRequired = data[0]?.required ?? 0;
 
-  // Closure-based tooltip so isDark is captured correctly
   const TooltipContent = useCallback(
     (props: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) => {
       const { active, payload, label } = props;
@@ -85,168 +83,145 @@ const BurnoutChart: React.FC<BurnoutChartProps> = ({ tasks, isDark = true, onTri
           ))}
         </div>
       );
-    },
-    [isDark]
+    }, [isDark]
   );
 
-  // Find burnout zone regions for ReferenceArea
+  // Burnout regions for ReferenceArea
   const burnoutRegions: Array<{ x1: string; x2: string }> = [];
-  let inBurnout = false;
-  let regionStart = '';
-
+  let inBurnout = false, regionStart = '';
   data.forEach((d, i) => {
-    if (d.burnout && !inBurnout) {
-      inBurnout = true;
-      regionStart = d.day;
-    } else if (!d.burnout && inBurnout) {
-      inBurnout = false;
-      burnoutRegions.push({ x1: regionStart, x2: data[i - 1].day });
-    }
+    if (d.burnout && !inBurnout) { inBurnout = true; regionStart = d.day; }
+    else if (!d.burnout && inBurnout) { inBurnout = false; burnoutRegions.push({ x1: regionStart, x2: data[i - 1].day }); }
   });
   if (inBurnout) burnoutRegions.push({ x1: regionStart, x2: data[data.length - 1].day });
 
-  const surfaceBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.85)';
+  const surfaceBg     = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.85)';
   const surfaceBorder = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)';
-  const gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
-  const tickColor = 'var(--text-faint)';
+  const gridColor     = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
 
   return (
     <motion.div
-      className="rounded-xl px-5 py-4"
+      data-tour="tour-burnout"
+      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.3, duration: 0.4 }}
+      className="mb-6 rounded-xl overflow-hidden"
       style={{
         background: surfaceBg,
-        border: `1px solid ${surfaceBorder}`,
-        boxShadow: isBurningToday
-          ? '0 0 0 1px rgba(239,68,68,0.15)'
-          : 'none',
+        border: `1px solid ${isBurningToday ? 'rgba(239,68,68,0.28)' : surfaceBorder}`,
       }}
-      animate={isBurningToday ? {
-        boxShadow: [
-          '0 0 0px rgba(239,68,68,0)',
-          '0 0 20px rgba(239,68,68,0.4)',
-          '0 0 0px rgba(239,68,68,0)',
-        ],
-      } : {}}
-      transition={isBurningToday ? { duration: 2.5, repeat: Infinity } : {}}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Zap size={11} style={{ color: isBurningToday ? '#ef4444' : 'var(--text-faint)' }} />
+      {/* ── Collapsed header — always visible ─────────────────────────── */}
+      <div
+        onClick={() => setExpanded(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-2.5 gap-3 cursor-pointer"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <Zap size={11} style={{ color: isBurningToday ? '#ef4444' : 'var(--text-faint)', flexShrink: 0 }} />
           <span className="text-[10px] font-mono uppercase tracking-wider"
             style={{ color: isBurningToday ? '#f87171' : 'var(--text-faint)' }}>
-            Burnout Horizon · 14 days
+            Burnout Horizon
           </span>
+          <InfoTooltip explanation="14-day workload forecast — compares hours your active tasks require each day against your 8h/day capacity limit." />
+          {isBurningToday ? (
+            <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full"
+              style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.22)' }}>
+              <AlertTriangle size={9} />
+              {todayRequired}h required today · {burnoutDays}d overloaded
+            </span>
+          ) : (
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full"
+              style={{ background: 'rgba(34,197,94,0.08)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.18)' }}>
+              capacity OK · 14-day horizon clear
+            </span>
+          )}
         </div>
-        {/* Legend pills */}
-        <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1 text-[10px] font-mono"
-            style={{ color: '#22c55e' }}>
-            <span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Available
-          </span>
-          <span className="flex items-center gap-1 text-[10px] font-mono"
-            style={{ color: '#ef4444' }}>
-            <span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Required
-          </span>
+        <div className="flex items-center gap-2 shrink-0">
+          {isBurningToday && !expanded && (
+            <motion.button
+              onClick={e => { e.stopPropagation(); onTriggerTriage(); }}
+              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+              className="text-[10px] font-semibold px-2.5 py-1 rounded-lg font-mono"
+              style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.3)' }}
+            >
+              Triage
+            </motion.button>
+          )}
+          <motion.div animate={{ rotate: expanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
+            <ChevronDown size={13} style={{ color: 'var(--text-faint)' }} />
+          </motion.div>
         </div>
       </div>
 
-      {/* Chart */}
-      <ResponsiveContainer width="100%" height={180}>
-        <AreaChart data={data} margin={{ top: 4, right: 0, left: -32, bottom: 0 }}>
-          <defs>
-            <linearGradient id="availGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#22c55e" stopOpacity={0.12} />
-              <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="reqGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#ef4444" stopOpacity={0.12} />
-              <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-
-          <CartesianGrid horizontal vertical={false} stroke={gridColor} />
-
-          <XAxis
-            dataKey="day"
-            tick={{ fill: tickColor, fontSize: 9, fontFamily: 'JetBrains Mono, monospace' }}
-            tickLine={false}
-            axisLine={false}
-            interval={1}
-          />
-
-          {/* Burnout reference areas */}
-          {burnoutRegions.map((r, i) => (
-            <ReferenceArea key={i} x1={r.x1} x2={r.x2}
-              fill="rgba(239,68,68,0.06)" strokeWidth={0}
-              label={{ value: '⚠ Burnout Zone', position: 'insideTopRight', fill: '#f87171', fontSize: 9, fontFamily: 'JetBrains Mono, monospace' }}
-            />
-          ))}
-
-          {/* Today marker */}
-          <ReferenceLine x="Today" stroke="rgba(255,255,255,0.15)" strokeDasharray="3 3" />
-
-          <Tooltip content={<TooltipContent />} />
-
-          <Area
-            type="monotone"
-            dataKey="available"
-            name="Available"
-            stroke="#22c55e"
-            strokeWidth={1.5}
-            fill="url(#availGrad)"
-            fillOpacity={1}
-            dot={false}
-            activeDot={{ r: 3, fill: '#22c55e', strokeWidth: 0 }}
-          />
-          <Area
-            type="monotone"
-            dataKey="required"
-            name="Required"
-            stroke="#ef4444"
-            strokeWidth={1.5}
-            fill="url(#reqGrad)"
-            fillOpacity={1}
-            dot={false}
-            activeDot={{ r: 3, fill: '#ef4444', strokeWidth: 0 }}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-
-      {/* Auto-triage trigger banner */}
-      <AnimatePresence>
-        {isBurningToday && (
+      {/* ── Expanded chart ─────────────────────────────────────────────── */}
+      <AnimatePresence initial={false}>
+        {expanded && (
           <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-3 flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg"
-            style={{
-              background: 'rgba(239,68,68,0.06)',
-              border: '1px solid rgba(239,68,68,0.18)',
-            }}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            style={{ overflow: 'hidden', borderTop: `1px solid ${surfaceBorder}` }}
           >
-            <div className="flex items-center gap-2 min-w-0">
-              <AlertTriangle size={12} style={{ color: '#f87171', flexShrink: 0 }} />
-              <span className="text-[11px] font-mono" style={{ color: 'var(--text-secondary)' }}>
-                ⚡ Your workload exceeds capacity today.
-              </span>
+            <div className="px-4 pt-3 pb-4">
+              {/* Legend */}
+              <div className="flex items-center gap-3 mb-3">
+                <span className="flex items-center gap-1 text-[10px] font-mono" style={{ color: '#22c55e' }}>
+                  <span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Available (8h)
+                </span>
+                <span className="flex items-center gap-1 text-[10px] font-mono" style={{ color: '#ef4444' }}>
+                  <span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Required
+                </span>
+              </div>
+
+              <ResponsiveContainer width="100%" height={160}>
+                <AreaChart data={data} margin={{ top: 4, right: 0, left: -32, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="availGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.12} />
+                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="reqGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.12} />
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid horizontal vertical={false} stroke={gridColor} />
+                  <XAxis dataKey="day"
+                    tick={{ fill: 'var(--text-faint)', fontSize: 9, fontFamily: 'JetBrains Mono, monospace' }}
+                    tickLine={false} axisLine={false} interval={1} />
+                  {burnoutRegions.map((r, i) => (
+                    <ReferenceArea key={i} x1={r.x1} x2={r.x2} fill="rgba(239,68,68,0.06)" strokeWidth={0} />
+                  ))}
+                  <ReferenceLine x="Today" stroke="rgba(255,255,255,0.15)" strokeDasharray="3 3" />
+                  <Tooltip content={<TooltipContent />} />
+                  <Area type="monotone" dataKey="available" name="Available"
+                    stroke="#22c55e" strokeWidth={1.5} fill="url(#availGrad)" dot={false}
+                    activeDot={{ r: 3, fill: '#22c55e', strokeWidth: 0 }} />
+                  <Area type="monotone" dataKey="required" name="Required"
+                    stroke="#ef4444" strokeWidth={1.5} fill="url(#reqGrad)" dot={false}
+                    activeDot={{ r: 3, fill: '#ef4444', strokeWidth: 0 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+
+              {isBurningToday && (
+                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                  className="mt-3 flex items-center justify-between gap-3 px-3 py-2 rounded-lg"
+                  style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}>
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={11} style={{ color: '#f87171', flexShrink: 0 }} />
+                    <span className="text-[11px] font-mono" style={{ color: 'var(--text-secondary)' }}>
+                      Workload exceeds capacity today.
+                    </span>
+                  </div>
+                  <motion.button onClick={onTriggerTriage}
+                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                    className="shrink-0 text-[11px] font-semibold px-3 py-1.5 rounded-lg font-mono whitespace-nowrap"
+                    style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.3)' }}>
+                    Run Triage
+                  </motion.button>
+                </motion.div>
+              )}
             </div>
-            <motion.button
-              onClick={onTriggerTriage}
-              whileHover={{ scale: 1.05, boxShadow: '0 0 16px rgba(245,158,11,0.35)' }}
-              whileTap={{ scale: 0.95 }}
-              className="shrink-0 text-[11px] font-semibold px-3 py-1.5 rounded-lg font-mono whitespace-nowrap"
-              style={{
-                background: 'rgba(245,158,11,0.12)',
-                color: '#fbbf24',
-                border: '1px solid rgba(245,158,11,0.3)',
-                boxShadow: '0 0 8px rgba(245,158,11,0.15)',
-              }}
-            >
-              Run Triage Now
-            </motion.button>
           </motion.div>
         )}
       </AnimatePresence>

@@ -158,9 +158,15 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         <motion.div {...fadeUp(0.08)} className="space-y-1">
           <h1
             className="font-bold tracking-tight leading-[1.1]"
-            style={{ fontSize: 'clamp(2.2rem, 5.5vw, 4rem)', color: 'var(--text-primary)' }}
+            style={{
+              fontSize: 'clamp(2.2rem, 5.5vw, 4rem)',
+              color: 'var(--text-primary)',
+              fontFamily: '"Cal Sans", "Bricolage Grotesque", "Plus Jakarta Sans", Inter, sans-serif',
+              letterSpacing: '-0.03em',
+            }}
           >
             Your AI agent for{' '}
+            <br />
             <span style={{
               background: 'linear-gradient(135deg, #22c55e 0%, #4ade80 50%, #38bdf8 100%)',
               WebkitBackgroundClip: 'text',

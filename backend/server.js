@@ -88,6 +88,12 @@ app.use((req, _res, next) => {
 // ─── Public routes (no auth required) ────────────────────────────────────────
 app.use('/api/auth', authRouter);
 
+// TTS status — public capability check, no user data involved
+app.get('/api/agent/tts/status', (_req, res) => {
+  const { isTTSConfigured } = require('./services/ttsService');
+  res.json({ configured: isTTSConfigured() });
+});
+
 // Health check (public, useful for frontend to detect backend)
 app.get('/api/health', (_req, res) => {
   const { isConnected } = require('./db/connection');

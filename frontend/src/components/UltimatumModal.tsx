@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, Brain, AlertTriangle, Calendar, X } from 'lucide-react';
 import { Task } from '../types';
 import { resolveUltimatum } from '../api';
+import { fmtHours } from '../data';
 
 interface UltimatumModalProps {
   taskA: Task; // includes failureCost
@@ -115,7 +116,7 @@ const ConflictCard: React.FC<ConflictCardProps> = ({
           <div className="flex items-center gap-1.5">
             <Clock size={10} style={{ color: '#f87171' }} />
             <span className="text-[11px] font-mono" style={{ color: '#f87171' }}>
-              {task.currentPaceHoursPerDay.toFixed(1)}h/day required
+              {fmtHours(task.currentPaceHoursPerDay)}/day required
             </span>
           </div>
         </div>

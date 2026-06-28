@@ -12,7 +12,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
-  Zap, Bot, ShieldAlert, Layers, X, ChevronRight, Sparkles, FlaskConical,
+  Zap, Bot, ShieldAlert, Layers, X, ChevronRight, Sparkles, FlaskConical, Activity,
 } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
 
@@ -92,6 +92,13 @@ const StartHereCard: React.FC<StartHereCardProps> = ({
       color: '#ec4899',
       action: () => { navigate('/agent-log'); sessionStorage.setItem('agent_log_tab', 'memory'); dismiss(); },
     },
+    {
+      icon: <Activity size={13} />,
+      label: 'Velocity Vector',
+      desc: 'See why we\'re called Velocity',
+      color: '#a78bfa',
+      action: () => { navigate('/velocity-vector'); dismiss(); },
+    },
   ];
 
   return (
@@ -125,7 +132,7 @@ const StartHereCard: React.FC<StartHereCardProps> = ({
                   <Zap size={12} className="text-green-400" />
                 </motion.div>
                 <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
-                  Start here — 5 things that show why this is an agent, not a scheduler
+                  Start here — 6 things that show why this is an agent, not a scheduler
                 </span>
               </div>
               <motion.button
@@ -139,8 +146,8 @@ const StartHereCard: React.FC<StartHereCardProps> = ({
               </motion.button>
             </div>
 
-            {/* Links grid — 5 links */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 px-4 pb-4">
+            {/* Links grid — 6 links */}
+            <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 px-4 pb-4">
               {links.map(({ icon, label, desc, color, action }, i) => (
                 <motion.button
                   key={label}
@@ -170,7 +177,7 @@ const StartHereCard: React.FC<StartHereCardProps> = ({
 
             <div className="px-4 pb-3">
               <p className="text-[10px] font-mono" style={{ color: 'var(--text-faint)' }}>
-                Tip: Agent Log has 15+ entries from today including action chains and learned behaviors — that's where the agency is visible.
+                Tip: "Velocity Vector" shows why the product is named Velocity — real trajectory vs. claimed progress, as a literal vector. Agent Log has 15+ entries from today including action chains and learned behaviors.
               </p>
             </div>
           </div>

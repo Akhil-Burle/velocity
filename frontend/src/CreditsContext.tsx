@@ -75,6 +75,8 @@ export const CreditsProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (updated.awarded) {
         burstId.current += 1;
         setBurst({ id: burstId.current, amount: updated.awarded.amount, label: updated.awarded.label });
+        // Auto-clear burst after animation completes
+        setTimeout(() => setBurst(null), 1400);
       }
       // Level-up detection
       if (prevLevel.current !== null && updated.level > prevLevel.current) {

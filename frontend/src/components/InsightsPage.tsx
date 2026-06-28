@@ -28,7 +28,9 @@ import {
   generateInsights, generateBriefing, fetchVelocityDNA, fetchLeaderboard, fetchPrebrief, fetchResults,
 } from '../api';
 import type { InsightsReport, VelocityDNA, LeaderboardResult, PrebriefReport, Achievement } from '../types';
+import { fmtHours } from '../data';
 import type { ResultsData } from '../api';
+import InfoTooltip from './InfoTooltip';
 
 // Map backend achievement icon names → lucide components
 const ACHIEVEMENT_ICONS: Record<string, React.ComponentType<{ size?: number; style?: React.CSSProperties }>> = {
@@ -57,15 +59,16 @@ const CalibRow: React.FC<{ row: InsightsReport['calibration'][0]; isDark: boolea
 
 // ── Section card shell ────────────────────────────────────────────────────────
 const Section: React.FC<{
-  icon: React.ReactNode; label: string; accent?: string; right?: React.ReactNode;
+  icon: React.ReactNode; label: string; accent?: string; right?: React.ReactNode; tooltip?: string;
   surfaceBg: string; surfaceBorder: string; divider: string; delay?: number; children: React.ReactNode;
-}> = ({ icon, label, accent, right, surfaceBg, surfaceBorder, divider, delay = 0, children }) => (
+}> = ({ icon, label, accent, right, tooltip, surfaceBg, surfaceBorder, divider, delay = 0, children }) => (
   <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
     className="rounded-xl overflow-hidden" style={{ background: surfaceBg, border: `1px solid ${surfaceBorder}` }}>
     <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: `1px solid ${divider}` }}>
       <div className="flex items-center gap-2">
         <span style={{ color: accent || 'var(--text-faint)' }}>{icon}</span>
         <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: accent || 'var(--text-faint)' }}>{label}</span>
+        {tooltip && <InfoTooltip explanation={tooltip} />}
       </div>
       {right}
     </div>
@@ -142,7 +145,7 @@ const InsightsPage: React.FC = () => {
     { icon: CheckCircle, label: 'Tasks Completed', value: String(report.stats.tasksCompleted), color: '#22c55e' },
     { icon: TrendingUp,  label: 'Velocity Score',  value: String(report.stats.avgVelocityScore), color: report.stats.avgVelocityScore >= 70 ? '#22c55e' : report.stats.avgVelocityScore >= 50 ? '#f59e0b' : '#ef4444' },
     { icon: Target,      label: 'On-Time Rate',    value: report.stats.onTimeRate, color: '#38bdf8' },
-    { icon: Clock,       label: 'Hours Logged',    value: `${report.stats.totalHoursLogged}h`, color: '#f59e0b' },
+    { icon: Clock,       label: 'Hours Logged',    value: fmtHours(report.stats.totalHoursLogged), color: '#f59e0b' },
   ] : [];
 
   if (loading) {
@@ -284,6 +287,9 @@ const InsightsPage: React.FC = () => {
               <div className="flex items-center gap-1.5 mb-1.5">
                 <Icon size={11} style={{ color: 'var(--text-faint)' }} />
                 <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>{label}</span>
+                {label === 'Velocity Score' && (
+                  <InfoTooltip explanation="Average across completed tasks: on-pace ratio weighted 60%, pace consistency weighted 40% — higher means steadier, deadline-hitting work." />
+                )}
               </div>
               <div className="font-bold font-mono text-2xl" style={{ color }}>{value}</div>
             </motion.div>
@@ -331,6 +337,7 @@ const VelocityDNACard: React.FC<{ dna: VelocityDNA; isDark: boolean; surfaceBg: 
   const data = dna.axes.map(a => ({ subject: a.axis, value: a.value, fullMark: 100 }));
   return (
     <Section icon={<Fingerprint size={12} />} label="Velocity DNA" accent="#a855f7"
+      tooltip="Radar fingerprint of your work style across 6 dimensions, derived from real task completions and check-in patterns — not a questionnaire."
       surfaceBg={surfaceBg} surfaceBorder={surfaceBorder} divider={divider} delay={0.05}
       right={<span className="text-[10px] font-mono px-2 py-0.5 rounded-full" style={{ background: 'rgba(168,85,247,0.1)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.25)' }}>Overall {dna.overall}</span>}>
       <div className="px-3 pt-2 pb-4">
@@ -349,6 +356,7 @@ const VelocityDNACard: React.FC<{ dna: VelocityDNA; isDark: boolean; surfaceBg: 
           <div className="flex items-center gap-2 mb-1">
             <Sparkles size={12} style={{ color: '#c084fc' }} />
             <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{dna.archetype}</span>
+            <InfoTooltip explanation="Your productivity archetype is inferred from the top two axes of your DNA radar — it describes your dominant work pattern, not a fixed personality type." />
           </div>
           <p className="text-[11px] leading-relaxed mb-3" style={{ color: 'var(--text-muted)' }}>{dna.archetypeBlurb}</p>
           <div className="flex flex-wrap gap-2">
@@ -514,7 +522,7 @@ const PrebriefCard: React.FC<{
 
         <div className="grid grid-cols-3 gap-2 mb-4">
           <MiniStat icon={<Target size={11} />} label="Tasks" value={String(prebrief.taskCount)} />
-          <MiniStat icon={<Clock size={11} />} label="Focus" value={`${prebrief.requiredHours}h`} />
+          <MiniStat icon={<Clock size={11} />} label="Focus" value={fmtHours(prebrief.requiredHours)} />
           <MiniStat icon={<Sunrise size={11} />} label="Start" value={start12} />
         </div>
 
@@ -572,7 +580,7 @@ const ResultsCard: React.FC<{
     { label: 'Tasks Completed', value: String(results.tasksCompleted), color: '#22c55e', icon: <CheckCircle size={11} /> },
     { label: 'On-Time Rate', value: `${results.onTimeRate}%`, color: results.onTimeRate >= 70 ? '#22c55e' : '#f59e0b', icon: <Clock size={11} /> },
     { label: 'AI Saves (Autonomous)', value: String(results.autonomousSaves), color: '#ef4444', icon: <Bot size={11} /> },
-    { label: 'Est. Hours Saved', value: `${results.hoursSaved}h`, color: '#38bdf8', icon: <Activity size={11} /> },
+    { label: 'Est. Hours Saved', value: fmtHours(results.hoursSaved), color: '#38bdf8', icon: <Activity size={11} /> },
   ];
 
   const breakdowns = [

@@ -71,7 +71,7 @@ async function handleBrainDump(req, res) {
 
   try {
     console.log(`[BrainDump] Extracting tasks for user ${userId}: "${text.slice(0, 80)}..."`);
-    const rawTasks = await extractTasksFromBrainDump(text.trim());
+    const rawTasks = await extractTasksFromBrainDump(text.trim(), req.body.tzOffsetMinutes || 0);
 
     if (!rawTasks || rawTasks.length === 0) {
       return res.status(422).json({

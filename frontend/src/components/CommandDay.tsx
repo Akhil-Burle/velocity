@@ -18,7 +18,9 @@ import {
 import { useTheme } from '../ThemeContext';
 import { useCredits } from '../CreditsContext';
 import { fetchDayPlan, rebalanceDayPlan, updateTask as apiUpdateTask, completeTask as apiCompleteTask, createAgentLogEntry } from '../api';
+import InfoTooltip from './InfoTooltip';
 import type { DayPlan, DayBlock, PaceStatus, TaskType } from '../types';
+import { fmtHours } from '../data';
 
 const STATUS_ACCENT: Record<PaceStatus, string> = {
   GREEN: '#22c55e', AMBER: '#f59e0b', RED: '#ef4444', COMPLETE: '#52525b', failed: '#71717a',
@@ -350,8 +352,8 @@ const CapacityBar: React.FC<{ plan: DayPlan; isDark: boolean; surfaceBg: string;
   const loadColor = summary.loadPercent > 100 ? '#ef4444' : summary.loadPercent > 80 ? '#f59e0b' : '#22c55e';
   const STATS = [
     { icon: Gauge, label: 'Day Load', value: `${summary.loadPercent}%`, color: loadColor },
-    { icon: Clock, label: 'Focus Required', value: `${summary.requiredHours}h`, color: '#f59e0b' },
-    { icon: CalendarRange, label: 'Capacity', value: `${summary.capacityHours}h`, color: '#38bdf8' },
+    { icon: Clock, label: 'Focus Required', value: fmtHours(summary.requiredHours), color: '#f59e0b' },
+    { icon: CalendarRange, label: 'Capacity', value: fmtHours(summary.capacityHours), color: '#38bdf8' },
     { icon: Layers, label: 'Scheduled', value: `${summary.scheduledCount}/${summary.taskCount}`, color: 'var(--text-primary)' },
   ];
   return (
@@ -365,6 +367,9 @@ const CapacityBar: React.FC<{ plan: DayPlan; isDark: boolean; surfaceBg: string;
             <div className="flex items-center gap-1.5 mb-1">
               <Icon size={11} style={{ color: 'var(--text-faint)' }} />
               <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>{label}</span>
+              {label === 'Day Load' && (
+                <InfoTooltip explanation="Total hours all tasks require today as a percentage of your 8h/day capacity — over 100% means you're over-scheduled." />
+              )}
             </div>
             <div className="font-bold font-mono text-xl" style={{ color }}>{value}</div>
           </motion.div>

@@ -21,6 +21,7 @@ export interface PaceMetrics {
   onPace: boolean;
   status: PaceStatus;
   consistency: number;       // 0–100 steadiness of pace
+  finishProbability?: number; // 0–100 probability of finishing on time
 }
 
 export interface CompletionAward {
@@ -31,6 +32,14 @@ export interface CompletionAward {
   onTime: boolean;
   reason: string;
   alreadyAwarded?: boolean;
+}
+
+export interface Subtask {
+  id: string;
+  title: string;
+  estimatedMinutes: number;
+  scheduledSlot: string | null;
+  completed: boolean;
 }
 
 export interface Task {
@@ -49,9 +58,10 @@ export interface Task {
   completionPercent: number; // 0–100
   course?: string;
   isRescheduled?: boolean;
+  deadlineExplicit?: boolean;
   sparkline: SparklinePoint[];
-  failureCost?: string; // populated by /api/ultimatum/evaluate
-  // Zero-Hour fields
+  subtasks?: Subtask[];
+  failureCost?: string;
   panicScaffold?: {
     checklist: string[];
     boilerplate: string;
@@ -59,8 +69,7 @@ export interface Task {
     generatedAt?: string;
   };
   energyLevel?: EnergyLevel;
-  estimatedDuration?: number; // minutes
-  // Credit economy + pace tracking
+  estimatedDuration?: number;
   creditValue?: number;
   creditsAwarded?: boolean;
   paceMetrics?: PaceMetrics;

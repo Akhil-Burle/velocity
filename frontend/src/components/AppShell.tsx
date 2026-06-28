@@ -7,16 +7,18 @@
  * button patterns from Dashboard.tsx.
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Zap, LayoutGrid, Target, Calendar, TrendingUp, Settings,
-  Sun, Moon, Bell, X, ChevronRight, AlertTriangle, Clock, CalendarRange, Bot, Layers,
+  Sun, Moon, Bell, X, ChevronRight, AlertTriangle, Clock, CalendarRange, Bot, Layers, Activity, LogOut,
 } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
-import { fetchActiveReminders } from '../api';
+import { useAuth } from '../AuthContext';
+import { fetchActiveReminders, computeDriftScoreBatch, VelocityVector as VelocityVectorType, setApiToken } from '../api';
 import { Reminder } from '../types';
 import CreditsTicker from './CreditsTicker';
+import VelocityVectorIndicator from './VelocityVector';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -29,6 +31,7 @@ const NAV_ITEMS = [
   { path: '/calendar',  icon: Calendar,     label: 'Calendar' },
   { path: '/insights',  icon: TrendingUp,   label: 'Insights' },
   { path: '/agent-log', icon: Bot,          label: 'Agent Log', highlight: true },
+  { path: '/velocity-vector', icon: Activity, label: 'Velocity Vector', highlight: true },
   { path: '/tech-stack',icon: Layers,       label: 'Tech Stack' },
   { path: '/settings',  icon: Settings,     label: 'Settings' },
 ];
@@ -201,8 +204,46 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const { theme, toggle } = useTheme();
   const isDark = theme === 'dark';
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : false);
+  const [velocityVector, setVelocityVector] = useState<VelocityVectorType | null>(null);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const avatarRef = useRef<HTMLDivElement>(null);
+
+  const handleLogout = () => {
+    setAvatarMenuOpen(false);
+    logout();
+    setApiToken(null);
+    navigate('/');
+  };
+
+  // Close avatar menu on outside click
+  useEffect(() => {
+    if (!avatarMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (avatarRef.current && !avatarRef.current.contains(e.target as Node)) {
+        setAvatarMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [avatarMenuOpen]);
+
+  useEffect(() => {
+    const loadVector = async () => {
+      try {
+        const data = await computeDriftScoreBatch();
+        setVelocityVector(data.velocityVector);
+      } catch { /* silently fail */ }
+    };
+    // Load on mount with delay to not compete with initial task fetch
+    const t = setTimeout(loadVector, 3000);
+    // Refresh every 5 minutes
+    const interval = setInterval(loadVector, 5 * 60000);
+    return () => { clearTimeout(t); clearInterval(interval); };
+  }, []);
 
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
@@ -361,20 +402,72 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
           {/* Right actions */}
           <div className="flex items-center gap-2">
+            {/* Velocity Vector indicator (Phase 4) */}
+            {velocityVector && (
+              <VelocityVectorIndicator
+                vector={velocityVector}
+                isDark={isDark}
+                surfaceBorder={surfaceBorder}
+              />
+            )}
+
             {/* Velocity Credits ticker — persistent across all pages */}
             <CreditsTicker isDark={isDark} surfaceBorder={surfaceBorder} />
 
             {/* Notification bell */}
             <NotificationBell isDark={isDark} surfaceBorder={surfaceBorder} />
 
-            {/* Avatar */}
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold select-none"
-              style={{
-                background: isDark ? 'linear-gradient(135deg,#3f3f46,#27272a)' : 'linear-gradient(135deg,#cbd5e1,#94a3b8)',
-                color: isDark ? '#e4e4e7' : '#1e293b',
-                border: `1px solid ${surfaceBorder}`,
-              }}>
-              A
+            {/* Avatar + logout dropdown */}
+            <div ref={avatarRef} className="relative">
+              <motion.button
+                onClick={() => setAvatarMenuOpen(v => !v)}
+                whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold select-none"
+                style={{
+                  background: isDark ? 'linear-gradient(135deg,#3f3f46,#27272a)' : 'linear-gradient(135deg,#cbd5e1,#94a3b8)',
+                  color: isDark ? '#e4e4e7' : '#1e293b',
+                  border: `1px solid ${surfaceBorder}`,
+                }}
+              >
+                A
+              </motion.button>
+
+              <AnimatePresence>
+                {avatarMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 6, scale: 0.96 }}
+                    transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute right-0 top-10 z-50 rounded-xl overflow-hidden"
+                    style={{
+                      width: 160,
+                      background: isDark ? 'rgba(13,17,23,0.98)' : 'rgba(248,250,252,0.98)',
+                      border: `1px solid ${surfaceBorder}`,
+                      backdropFilter: 'blur(20px)',
+                      boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
+                    }}
+                  >
+                    <div className="px-3 py-2" style={{ borderBottom: `1px solid ${surfaceBorder}` }}>
+                      <p className="text-[10px] font-mono" style={{ color: 'var(--text-faint)' }}>Signed in as</p>
+                      <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>demo</p>
+                    </div>
+                    <div className="p-1.5">
+                      <motion.button
+                        onClick={handleLogout}
+                        whileHover={{ x: 2 }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold"
+                        style={{ color: '#f87171', background: 'transparent' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.08)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <LogOut size={12} />
+                        Log out
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </motion.header>

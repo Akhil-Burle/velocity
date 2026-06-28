@@ -9,6 +9,27 @@ const WEIGHT_BASE_HOURS: Record<CognitiveWeight, number> = {
   LOW: 1,
 };
 
+/**
+ * Format a decimal hour value into a human-readable string.
+ *   0.5  → "30m"
+ *   1.0  → "1h"
+ *   1.5  → "1h 30m"
+ *   2.25 → "2h 15m"
+ *
+ * @param hours  Decimal hours value
+ * @param perDay If true, appends "/day" suffix  (e.g. "1h 30m/day")
+ */
+export function fmtHours(hours: number, perDay = false): string {
+  const totalMins = Math.round(hours * 60);
+  const h = Math.floor(totalMins / 60);
+  const m = totalMins % 60;
+  let str: string;
+  if (h === 0)      str = `${m}m`;
+  else if (m === 0) str = `${h}h`;
+  else              str = `${h}h ${m}m`;
+  return perDay ? `${str}/day` : str;
+}
+
 /** Fractional days remaining from now until an ISO deadline string. */
 export function daysRemaining(isoDeadline: string): number {
   const deadline = new Date(isoDeadline).getTime();
@@ -115,6 +136,8 @@ export function computePaceMetrics(task: Task, now: number = Date.now()): PaceMe
   else if (willFinishOnTime && daysToDeadline > 0) status = 'AMBER';
   else status = 'RED';
 
+  const consistency = computeConsistency(task.sparkline);
+
   return {
     expected: Math.round(expected),
     actual: Math.round(actual),
@@ -127,8 +150,39 @@ export function computePaceMetrics(task: Task, now: number = Date.now()): PaceMe
     willFinishOnTime,
     onPace: drift >= -3,
     status,
-    consistency: computeConsistency(task.sparkline),
+    consistency,
+    finishProbability: computeFinishProbability({ drift, velocityRate: rate, requiredRate, consistency, daysToDeadline, actual }),
   };
+}
+
+/**
+ * Compute a 0–100 finish probability — mirrors backend paceEngine.js exactly.
+ * Called inline inside computePaceMetrics so every task always has a probability.
+ */
+export function computeFinishProbability(metrics: {
+  drift: number;
+  velocityRate: number;
+  requiredRate: number;
+  consistency: number;
+  daysToDeadline: number;
+  actual: number;
+}): number {
+  if (metrics.actual >= 100) return 100;
+
+  const pDrift = Math.max(0.1, Math.min(1.0, 0.85 + metrics.drift * 0.006));
+
+  const vRatio = metrics.requiredRate > 0
+    ? Math.min(metrics.velocityRate / metrics.requiredRate, 1.2)
+    : metrics.velocityRate > 0 ? 1.0 : 0;
+  const pVelocity = Math.max(0.1, Math.min(0.95, 0.1 + vRatio * 0.85));
+
+  const pConsistency = 0.52 + (metrics.consistency / 100) * 0.46;
+
+  const d = Math.max(0, metrics.daysToDeadline);
+  const pDeadline = d >= 3 ? 1.0 : 0.35 + (d / 3) * 0.65;
+
+  const raw = pDrift * pVelocity * pConsistency * pDeadline;
+  return Math.max(2, Math.min(99, Math.round(raw * 100)));
 }
 
 // ─── Hot-Start Code Templates ────────────────────────────────────────────────

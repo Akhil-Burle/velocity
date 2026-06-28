@@ -195,10 +195,63 @@ function computeCompletionAward(task, completedAt = Date.now()) {
   };
 }
 
+// ─── Finish Probability ───────────────────────────────────────────────────────
+
+/**
+ * Compute a 0–100 finish probability for a task.
+ *
+ * Models four independent risk factors and combines them multiplicatively:
+ *
+ *   pDrift      — how far ahead/behind the expected line you are
+ *   pVelocity   — whether your actual pace can cover the remaining distance
+ *   pConsistency — how steady (not erratic) your pace has been
+ *   pDeadline   — runway pressure (near-deadline amplifies all risks)
+ *
+ * A task on the ideal line with a steady pace and 5 days left → ~95%.
+ * A task 25% behind with no velocity and 1 day left → ~8%.
+ */
+function computeFinishProbability(task, now = Date.now()) {
+  const actual = clamp(task.completionPercent || 0);
+  if (actual >= 100) return 100;
+
+  const metrics = computePaceMetrics(task, now);
+
+  // ── Factor 1: Drift (how far off the ideal line) ─────────────────────────
+  // drift = actual − expected. 0 = perfect. Negative = behind.
+  // Map drift to a probability: +20 drift → 1.0, 0 → 0.85, -25 → 0.25
+  const pDrift = clamp(0.85 + metrics.drift * 0.006, 0.1, 1.0);
+
+  // ── Factor 2: Velocity adequacy ───────────────────────────────────────────
+  // Does your actual velocity cover the required rate?
+  // If velocityRate >= requiredRate → good. If 0 velocity → very bad.
+  const vRatio = metrics.requiredRate > 0
+    ? Math.min(metrics.velocityRate / metrics.requiredRate, 1.2)
+    : metrics.velocityRate > 0 ? 1.0 : 0;
+  // Map: ratio 1.0+ → 0.95, ratio 0.5 → 0.6, ratio 0 → 0.1
+  const pVelocity = clamp(0.1 + vRatio * 0.85, 0.1, 0.95);
+
+  // ── Factor 3: Consistency (steady pace vs erratic/cramming) ──────────────
+  // consistency 0–100. Map linearly: 100 → 0.98, 50 → 0.75, 0 → 0.52
+  const pConsistency = 0.52 + (metrics.consistency / 100) * 0.46;
+
+  // ── Factor 4: Deadline pressure amplifier ────────────────────────────────
+  // When the deadline is very close, any risk is amplified.
+  // daysToDeadline 0 → amplifier 0.35 (brutal), 1 → 0.65, 3+ → 1.0 (neutral)
+  const d = Math.max(0, metrics.daysToDeadline);
+  const pDeadline = d >= 3 ? 1.0 : 0.35 + (d / 3) * 0.65;
+
+  // Combine: multiplicative so any single bad factor drags the whole score
+  const raw = pDrift * pVelocity * pConsistency * pDeadline;
+
+  // Scale to 0–100 and floor at 2 (never show 0% while task is alive)
+  return Math.max(2, Math.min(99, Math.round(raw * 100)));
+}
+
 module.exports = {
   computeTaskCredits,
   computePaceMetrics,
   computeCompletionAward,
+  computeFinishProbability,
   velocityRate,
   computeConsistency,
 };

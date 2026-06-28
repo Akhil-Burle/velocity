@@ -15,6 +15,8 @@ import SettingsPage from './components/SettingsPage';
 import CommandDay from './components/CommandDay';
 import AgentLogPage from './components/AgentLogPage';
 import TechStackPage from './components/TechStackPage';
+import VelocityVectorPage from './components/VelocityVectorPage';
+import { ToastProvider } from './components/Toast';
 import { Zap } from 'lucide-react';
 
 const pageVariants = {
@@ -139,6 +141,9 @@ function AppInner() {
         <Route path="/tech-stack" element={
           <ShellPage><TechStackPage /></ShellPage>
         } />
+        <Route path="/velocity-vector" element={
+          <ShellPage><VelocityVectorPage /></ShellPage>
+        } />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -152,7 +157,9 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <CreditsProvider>
-          <AppInner />
+          <ToastProvider>
+            <AppInner />
+          </ToastProvider>
         </CreditsProvider>
       </AuthProvider>
     </ThemeProvider>

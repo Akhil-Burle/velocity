@@ -21,24 +21,23 @@
   --border-strong:  rgba(255,255,255,0.2);
 
   /*
-   * TEXT HIERARCHY — maximised for low-brightness display readability
-   * Every level is at least 2 steps brighter than before.
+   * TEXT HIERARCHY — tuned for low-brightness display readability
    * primary   → pure white         (21:1)
    * secondary → bright near-white  (15:1)
    * tertiary  → clear light slate  (10:1)
-   * muted     → readable slate     ( 7:1)
-   * faint     → still legible      ( 5:1) — minimum for ANY visible text
+   * muted     → readable mid-slate  ( 8:1) ← bumped from slate-300 to slate-200
+   * faint     → clearly visible     ( 6:1) ← bumped from 8899aa to a4b4c4
    */
   --text-primary:   #ffffff;   /* pure white — maximum contrast */
   --text-secondary: #f1f5f9;   /* slate-100 */
   --text-tertiary:  #e2e8f0;   /* slate-200 */
-  --text-muted:     #b0bec8;   /* custom — between slate-300/400 */
-  --text-faint:     #8899aa;   /* custom — readable on all dark surfaces */
-  --text-code:      #93c5fd;   /* blue-300 — brighter than sky-300 */
+  --text-muted:     #cbd5e1;   /* slate-300 — was b0bec8 */
+  --text-faint:     #a4b4c4;   /* custom — was 8899aa, now clearly legible at low brightness */
+  --text-code:      #93c5fd;   /* blue-300 */
 
   --input-bg:       rgba(255,255,255,0.07);
   --input-border:   rgba(255,255,255,0.14);
-  --input-placeholder: #8899aa;
+  --input-placeholder: #a4b4c4;
 
   --scrollbar-thumb: rgba(255,255,255,0.15);
   --scrollbar-hover: rgba(255,255,255,0.28);
@@ -88,8 +87,8 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   background: var(--bg-base);
   color: var(--text-primary);
-  font-size: 14px;   /* back to 14px base — size bumps happen via the tier overrides below */
-  line-height: 1.65;
+  font-size: 15px;   /* bumped from 14px — improves readability at all brightness levels */
+  line-height: 1.7;
   text-rendering: optimizeLegibility;
   font-weight: 400;
 }
@@ -100,22 +99,21 @@ body {
 
 /*
  * FONT SIZE SCALE LIFT — dark mode only
- * Bumped up by 1px per tier (was 2px — dialled back slightly).
+ * Bumped up by 1–2px per tier to improve legibility at low brightness.
  *
- *   text-[9px]  → 10px  (was 9px)
- *   text-[10px] → 11px  (was 10px)
- *   text-[11px] → 12px  (was 11px)
- *   text-xs     → 12px  (was 12px / 0.75rem — unchanged, already right)
+ *   text-[9px]  → 11px  (was 10px)
+ *   text-[10px] → 12px  (was 11px)
+ *   text-[11px] → 13px  (was 12px)
+ *   text-xs     → 13px  (was 12px)
  */
-[data-theme="dark"] .text-\[9px\]  { font-size: 10px !important; }
-[data-theme="dark"] .text-\[10px\] { font-size: 11px !important; }
-[data-theme="dark"] .text-\[11px\] { font-size: 12px !important; }
-[data-theme="dark"] .text-xs       { font-size: 12px !important; }
+[data-theme="dark"] .text-\[9px\]  { font-size: 11px !important; }
+[data-theme="dark"] .text-\[10px\] { font-size: 12px !important; }
+[data-theme="dark"] .text-\[11px\] { font-size: 13px !important; }
+[data-theme="dark"] .text-xs       { font-size: 13px !important; }
 
 /*
  * FONT WEIGHT LIFT — dark mode only
- * Thin font weights (400) at small sizes on dark backgrounds are extremely
- * hard to read at low brightness. Bump all small text to medium weight.
+ * Small text on dark backgrounds needs more weight to read at low brightness.
  */
 [data-theme="dark"] .text-\[9px\],
 [data-theme="dark"] .text-\[10px\],
@@ -131,8 +129,7 @@ body {
 
 /*
  * MONO TEXT OVERRIDE — dark mode
- * Monospace fonts render visually thinner than proportional fonts at the same
- * weight. Subpixel antialiasing and a slight weight bump compensates.
+ * Monospace fonts render visually thinner — subpixel AA + weight bump compensates.
  */
 [data-theme="dark"] .font-mono {
   -webkit-font-smoothing: subpixel-antialiased;
@@ -144,11 +141,11 @@ body {
 [data-theme="dark"] .font-mono.font-semibold,
 [data-theme="dark"] .font-mono.font-medium { font-weight: inherit; }
 
-/* Small letter-spacing lift for ALL tiny text in dark mode — helps at small sizes */
+/* Letter-spacing lift for tiny dark mode text */
 [data-theme="dark"] .text-\[9px\],
 [data-theme="dark"] .text-\[10px\],
 [data-theme="dark"] .text-\[11px\] {
-  letter-spacing: 0.012em;
+  letter-spacing: 0.018em;
 }
 
 /* ─── Waveform animation ───────────────────────────────────────────────────── */
@@ -237,9 +234,9 @@ body {
   width: 100%;
   height: 3px;
   border-radius: 9999px;
-  background: var(--bg-surface-hi);
   outline: none;
   cursor: pointer;
+  background: rgba(255,255,255,0.1);
 }
 .velocity-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -248,13 +245,14 @@ body {
   height: 14px;
   border-radius: 50%;
   background: var(--slider-accent, #22c55e);
-  box-shadow: 0 0 8px var(--slider-accent, rgba(34,197,94,0.7));
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.4), 0 0 8px var(--slider-accent, rgba(34,197,94,0.5));
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  margin-top: -5px;
 }
-.velocity-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.25);
-  box-shadow: 0 0 14px var(--slider-accent, rgba(34,197,94,0.9));
+.velocity-slider::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 9999px;
+  background: transparent;
 }
 .velocity-slider::-moz-range-thumb {
   width: 14px;
@@ -262,10 +260,18 @@ body {
   border: none;
   border-radius: 50%;
   background: var(--slider-accent, #22c55e);
-  box-shadow: 0 0 8px var(--slider-accent, rgba(34,197,94,0.7));
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.4), 0 0 8px var(--slider-accent, rgba(34,197,94,0.5));
   cursor: pointer;
 }
-
+.velocity-slider::-moz-range-track {
+  height: 3px;
+  border-radius: 9999px;
+  background: transparent;
+}
+.velocity-slider::-moz-range-progress {
+  background: var(--slider-accent, #22c55e);
+  border-radius: 9999px;
+}
 [data-theme="light"] .velocity-slider {
   background: rgba(0,0,0,0.1);
 }
@@ -286,3 +292,59 @@ body {
 /* ─── Perspective context ────────────────────────────────────────────────── */
 
 .perspective-card-container { perspective: 900px; }
+
+/* ─── Landing page premium effects ──────────────────────────────────────── */
+
+/* Animated gradient text — for hero headline accent words */
+@keyframes gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.gradient-text-animated {
+  background-size: 200% 200%;
+  animation: gradient-shift 4s ease infinite;
+}
+
+/* Glow pulse for metric cards */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0px rgba(34,197,94,0.0); }
+  50%       { box-shadow: 0 0 30px rgba(34,197,94,0.15), 0 0 60px rgba(34,197,94,0.06); }
+}
+
+/* Ambient border glow — applied to hero container */
+@keyframes border-glow {
+  0%, 100% { border-color: rgba(34,197,94,0.15); }
+  50%       { border-color: rgba(34,197,94,0.35); }
+}
+
+/* Scanline overlay for terminal effect */
+.terminal-scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Noise texture overlay */
+.noise-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+/* Metric card entrance float */
+@keyframes float-card {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-6px); }
+}
+
+.float-animate {
+  animation: float-card 4s ease-in-out infinite;
+}

@@ -1,30 +1,12 @@
 /**
- * FinalCTASection.tsx
- * ─────────────────────────────────────────────────────────────────────────────
- * Closing call-to-action section at the bottom of the landing page.
- *
- * Presents a bold closing hook headline followed by two CTAs:
- *   - Primary:   "Enter Demo Sandbox" — green gradient, manages its own
- *                `isLoading` state, spinner while loading, hover lift/glow,
- *                press scale-down feedback.
- *   - Secondary: "See how it works"  — ghost/outline style, smooth-scrolls to
- *                #feature-showcase.
- *
- * Motion:
- *   - When `!reducedMotion`: hover → lift + scale + box-shadow glow;
- *                            press  → scale-down.
- *   - When `reducedMotion`:  hover/press use color-change only (no transform).
- *
- * Layout: centered, max-w-3xl, generous vertical padding, text-center.
- * Root element carries `id="cta"` for milestone tracking.
- *
- * Requirements: 9.1, 9.2, 9.3, 9.4, 9.5
+ * FinalCTASection.tsx — UPGRADED
+ * Final CTA: impossible to miss, no further scrolling needed.
+ * Physics-weighted button with spring hover, shimmer shimmer.
  */
-
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-
-// ─── Props ────────────────────────────────────────────────────────────────────
+import { Sparkles, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { useTheme } from '../../../ThemeContext';
 
 interface FinalCTASectionProps {
   onEnterDemo: () => void | Promise<void>;
@@ -32,258 +14,116 @@ interface FinalCTASectionProps {
   reducedMotion: boolean;
 }
 
-// ─── Spinner ─────────────────────────────────────────────────────────────────
-
-/** Inline SVG spinner matching the Design System green accent. */
 const Spinner: React.FC = () => (
-  <svg
-    aria-hidden="true"
-    className="animate-spin"
-    width="20"
-    height="20"
-    viewBox="0 0 20 20"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <circle
-      cx="10"
-      cy="10"
-      r="8"
-      stroke="rgba(255,255,255,0.3)"
-      strokeWidth="3"
-    />
-    <path
-      d="M10 2 a8 8 0 0 1 8 8"
-      stroke="white"
-      strokeWidth="3"
-      strokeLinecap="round"
-    />
+  <svg aria-hidden="true" className="animate-spin" width="18" height="18" viewBox="0 0 20 20" fill="none">
+    <circle cx="10" cy="10" r="8" stroke="rgba(0,0,0,0.2)" strokeWidth="3" />
+    <path d="M10 2 a8 8 0 0 1 8 8" stroke="#000" strokeWidth="3" strokeLinecap="round" />
   </svg>
 );
 
-// ─── FinalCTASection ──────────────────────────────────────────────────────────
-
-const FinalCTASection: React.FC<FinalCTASectionProps> = ({
-  onEnterDemo,
-  onSeeHowItWorks,
-  reducedMotion,
-}) => {
+const FinalCTASection: React.FC<FinalCTASectionProps> = ({ onEnterDemo, onSeeHowItWorks, reducedMotion }) => {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [isLoading, setIsLoading] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
-  const sectionRef = useRef<HTMLElement>(null);
+  const [visible, setVisible] = useState(reducedMotion);
+  const ref = useRef<HTMLElement>(null);
 
-  // ── Viewport entry — fade/slide section in ──────────────────────────────────
   useEffect(() => {
-    const el = sectionRef.current;
+    if (reducedMotion) { setVisible(true); return; }
+    const el = ref.current;
     if (!el) return;
-
-    if (reducedMotion || typeof IntersectionObserver === 'undefined') {
-      setIsVisible(true);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.2 },
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } }, { threshold: 0.2 });
+    obs.observe(el);
+    return () => obs.disconnect();
   }, [reducedMotion]);
 
-  // ── Primary CTA click ───────────────────────────────────────────────────────
   const handleEnterDemo = async () => {
     if (isLoading) return;
     setIsLoading(true);
-    try {
-      await onEnterDemo();
-    } finally {
-      // If navigation occurs the component will unmount; setIsLoading(false)
-      // is still safe to call even if unmounted (React 18 no-ops it).
-      setIsLoading(false);
-    }
+    try { await onEnterDemo(); } finally { setIsLoading(false); }
   };
 
-  // ── Animation config ────────────────────────────────────────────────────────
   const ease: [number, number, number, number] = [0.16, 1, 0.3, 1];
-  const shouldReveal = reducedMotion || isVisible;
 
   return (
-    <section
-      id="cta"
-      ref={sectionRef}
-      className="w-full px-5 sm:px-8 py-24 sm:py-32"
-      style={{ minHeight: '400px' }}
-    >
+    <section ref={ref} id="cta" className="w-full px-5 sm:px-8 py-24 sm:py-32">
       <motion.div
-        initial={reducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 32 }}
-        animate={shouldReveal ? { opacity: 1, y: 0 } : { opacity: 0, y: 32 }}
-        transition={reducedMotion ? { duration: 0 } : { duration: 0.7, ease }}
+        initial={reducedMotion ? {} : { opacity: 0, y: 32 }}
+        animate={visible ? { opacity: 1, y: 0 } : { opacity: 0, y: 32 }}
+        transition={{ duration: 0.7, ease }}
         className="max-w-3xl mx-auto text-center"
       >
-        {/* ── Eyebrow label ─────────────────────────────────────────────────── */}
-        <p
-          className="text-xs font-mono uppercase tracking-widest mb-5"
-          style={{ color: '#22c55e' }}
-        >
+        <p className="text-[11px] font-mono uppercase tracking-widest mb-5" style={{ color: '#22c55e' }}>
           Try it now — no setup required
         </p>
 
-        {/* ── Closing headline ──────────────────────────────────────────────── */}
-        <h2
-          className="text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight mb-5"
-          style={{ color: 'var(--text-primary)' }}
-        >
-          Ready to stop pretending
+        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight mb-5"
+          style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+          Stop measuring speed.
           <br className="hidden sm:block" />
-          {' '}everything fits?
+          <span style={{ background: 'linear-gradient(135deg, #22c55e 0%, #4ade80 60%, #38bdf8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+            Start tracking direction.
+          </span>
         </h2>
 
-        {/* ── Supporting copy ───────────────────────────────────────────────── */}
-        <p
-          className="text-base sm:text-lg leading-relaxed mb-10 max-w-xl mx-auto"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          Enter the demo sandbox and see Velocity make a hard call — in under
-          thirty seconds.
+        <p className="text-base sm:text-lg leading-relaxed mb-10 max-w-xl mx-auto" style={{ color: 'var(--text-secondary)' }}>
+          Enter the demo sandbox. In under thirty seconds, you'll see the Velocity Vector,
+          the Drift Score diverging from your self-report, and the Deadline Physics curve steepening in real time.
         </p>
 
-        {/* ── CTA row ───────────────────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          {/* Primary CTA — "Enter Demo Sandbox" */}
-          <PrimaryButton
-            isLoading={isLoading}
-            reducedMotion={reducedMotion}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+          {/* Primary CTA */}
+          <motion.button
+            type="button"
+            disabled={isLoading}
             onClick={handleEnterDemo}
-          />
+            whileHover={reducedMotion ? {} : { scale: 1.04, y: -3, boxShadow: '0 10px 40px rgba(34,197,94,0.45)' }}
+            whileTap={reducedMotion ? {} : { scale: 0.97 }}
+            className="relative inline-flex items-center gap-2.5 rounded-2xl px-9 py-4 text-base font-bold overflow-hidden"
+            style={{
+              background: isLoading ? 'rgba(34,197,94,0.35)' : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+              color: '#000',
+              boxShadow: '0 0 0 1px rgba(34,197,94,0.25), 0 6px 28px rgba(34,197,94,0.28)',
+              transition: 'transform 0.18s cubic-bezier(0.16,1,0.3,1), box-shadow 0.18s cubic-bezier(0.16,1,0.3,1)',
+            }}
+          >
+            {/* Shimmer sweep */}
+            <motion.div className="absolute inset-0 pointer-events-none"
+              style={{ background: 'linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.25) 50%,transparent 60%)' }}
+              animate={{ x: ['-100%', '200%'] }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: 'linear', repeatDelay: 1.5 }} />
+            {isLoading
+              ? <><Spinner /><span>Loading…</span></>
+              : <><Sparkles size={15} /><span>Enter Demo Sandbox</span><ArrowRight size={15} /></>
+            }
+          </motion.button>
 
-          {/* Secondary CTA — "See how it works" */}
-          <SecondaryButton
-            reducedMotion={reducedMotion}
-            onClick={onSeeHowItWorks}
-          />
+          {/* Secondary */}
+          <motion.button type="button" onClick={onSeeHowItWorks}
+            whileHover={reducedMotion ? {} : { y: -2, transition: { duration: 0.15 } }}
+            className="inline-flex items-center justify-center rounded-2xl px-8 py-4 text-base font-semibold"
+            style={{ color: 'var(--text-secondary)', background: 'transparent', border: '1.5px solid var(--border-subtle)', transition: 'color 0.18s ease, border-color 0.18s ease' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-medium)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; }}
+          >
+            See how it works
+          </motion.button>
+        </div>
+
+        <div className="flex items-center justify-center gap-4 flex-wrap">
+          {['No account needed', 'Pre-loaded demo data', 'Google Sign-In available'].map((item, i) => (
+            <motion.div key={item}
+              initial={reducedMotion ? {} : { opacity: 0, y: 8 }}
+              animate={visible ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+              transition={{ duration: 0.4, delay: 0.4 + i * 0.08, ease }}
+              className="flex items-center gap-1.5">
+              <CheckCircle2 size={11} className="text-green-400" />
+              <span className="text-[11px] font-mono" style={{ color: isDark ? '#64748b' : '#9ca3af' }}>{item}</span>
+            </motion.div>
+          ))}
         </div>
       </motion.div>
     </section>
-  );
-};
-
-// ─── PrimaryButton ─────────────────────────────────────────────────────────────
-
-interface PrimaryButtonProps {
-  isLoading: boolean;
-  reducedMotion: boolean;
-  onClick: () => void;
-}
-
-const PrimaryButton: React.FC<PrimaryButtonProps> = ({
-  isLoading,
-  reducedMotion,
-  onClick,
-}) => {
-  const [hovered, setHovered] = useState(false);
-  const [pressed, setPressed] = useState(false);
-
-  // Reduced motion: color-change feedback only (no transforms)
-  const reducedMotionHoverStyle: React.CSSProperties = hovered
-    ? { background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' }
-    : {};
-
-  // Full motion: lift + scale + glow on hover; scale-down on press
-  const fullMotionStyle: React.CSSProperties =
-    hovered && !pressed
-      ? {
-          transform: 'translateY(-3px) scale(1.04)',
-          boxShadow: '0 8px 32px rgba(34, 197, 94, 0.45)',
-        }
-      : pressed
-        ? { transform: 'scale(0.96)', boxShadow: 'none' }
-        : {};
-
-  const dynamicStyle: React.CSSProperties = reducedMotion
-    ? reducedMotionHoverStyle
-    : fullMotionStyle;
-
-  return (
-    <button
-      type="button"
-      disabled={isLoading}
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setPressed(false); }}
-      onMouseDown={() => setPressed(true)}
-      onMouseUp={() => setPressed(false)}
-      aria-label={isLoading ? 'Loading demo sandbox…' : 'Enter Demo Sandbox'}
-      className="inline-flex items-center justify-center gap-2.5 rounded-2xl px-8 py-4 text-base font-semibold text-white select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-green-400 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
-      style={{
-        background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-        transition: reducedMotion
-          ? 'background 0.2s ease'
-          : 'transform 0.18s cubic-bezier(0.16,1,0.3,1), box-shadow 0.18s cubic-bezier(0.16,1,0.3,1), background 0.18s ease',
-        ...dynamicStyle,
-        // Ensure disabled state doesn't carry hover transform
-        ...(isLoading ? { transform: 'none', boxShadow: 'none' } : {}),
-      }}
-    >
-      {isLoading ? (
-        <>
-          <Spinner />
-          <span>Loading…</span>
-        </>
-      ) : (
-        'Enter Demo Sandbox'
-      )}
-    </button>
-  );
-};
-
-// ─── SecondaryButton ───────────────────────────────────────────────────────────
-
-interface SecondaryButtonProps {
-  reducedMotion: boolean;
-  onClick: () => void;
-}
-
-const SecondaryButton: React.FC<SecondaryButtonProps> = ({
-  reducedMotion,
-  onClick,
-}) => {
-  const [hovered, setHovered] = useState(false);
-
-  const hoverStyle: React.CSSProperties = hovered
-    ? reducedMotion
-      ? { color: 'var(--text-primary)', borderColor: 'var(--text-secondary)' }
-      : {
-          color: 'var(--text-primary)',
-          borderColor: 'var(--text-secondary)',
-          transform: 'translateY(-2px)',
-        }
-    : {};
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className="inline-flex items-center justify-center rounded-2xl px-8 py-4 text-base font-semibold select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-green-400 focus-visible:ring-offset-2"
-      style={{
-        color: 'var(--text-secondary)',
-        background: 'transparent',
-        border: '1.5px solid var(--border-subtle)',
-        transition: reducedMotion
-          ? 'color 0.2s ease, border-color 0.2s ease'
-          : 'color 0.18s ease, border-color 0.18s ease, transform 0.18s cubic-bezier(0.16,1,0.3,1)',
-        ...hoverStyle,
-      }}
-    >
-      See how it works
-    </button>
   );
 };
 

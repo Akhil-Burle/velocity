@@ -8,6 +8,7 @@ const { computePaceMetrics } = require('../utils/paceEngine');
 const TaskModel = require('../models/Task');
 const CheckInModel = require('../models/CheckIn');
 const { isConnected } = require('../db/connection');
+const { generate } = require('../services/geminiService');
 
 async function generateInsights(req, res) {
   const userId = req.userId;
@@ -68,12 +69,8 @@ async function generateInsights(req, res) {
 
   if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here') {
     try {
-      const { GoogleGenerativeAI } = require('@google/generative-ai');
-      const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = gemini.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
       const prompt = `You are a productivity coach. Based on these metrics, write a 2-3 sentence productivity summary and 3 specific recommendations.\n\nTasks total: ${tasks.length}\nCompleted: ${completedTasks.length}\nActive: ${activeTasks.length}\nFailed (deliberate): ${failedTasks.length}${failedTasks.length > 0 ? ` (${failedTasks.map(t => `"${t.taskName}"`).join(', ')})` : ''}\nOn-time rate: ${onTimeRate}\nAvg velocity score: ${avgVelocityScore}/100\nTask types: ${Object.keys(typeGroups).join(', ')}\nCheck-in count: ${checkins.length}\n\n${failedTasks.length > 0 ? 'IMPORTANT: Some tasks were deliberately failed via the Ultimatum feature — acknowledge this honestly if relevant, do not pretend everything is fine.' : ''}\n\nReturn JSON: { "summary": "...", "recommendations": ["...", "...", "..."] }\nNo markdown, just raw JSON.`;
-      const result = await model.generateContent(prompt);
-      const text = result.response.text().trim().replace(/```json\s*/gi, '').replace(/```\s*/gi, '');
+      const text = (await generate(prompt)).replace(/```json\s*/gi, '').replace(/```\s*/gi, '');
       const parsed = JSON.parse(text);
       summary = parsed.summary || '';
       recommendations = parsed.recommendations || [];
@@ -251,13 +248,9 @@ async function getPrebrief(req, res) {
     let briefing = '';
     if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here' && relevant.length > 0) {
       try {
-        const { GoogleGenerativeAI } = require('@google/generative-ai');
-        const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = gemini.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
         const list = relevant.slice(0, 4).map(t => `${t.taskName} (${t.cognitiveWeight} weight, ${t.status}, ~${t.currentPaceHoursPerDay}h/day)`).join('; ');
         const prompt = `You are a calm, sharp planning coach writing a short evening pre-brief for tomorrow. 2-3 sentences, second person, concrete. ${relevant.length} tasks, ${requiredHours}h of focused work required, recommended start ${recommendedStart}. Tasks: ${list}. No greeting fluff beyond one short opener.`;
-        const result = await model.generateContent(prompt);
-        briefing = result.response.text().trim();
+        briefing = await generate(prompt);
       } catch (e) {
         console.warn('[Insights] prebrief Gemini failed:', e.message);
       }

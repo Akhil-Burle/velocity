@@ -13,7 +13,8 @@
  *   - Degrades gracefully on sparse data → shows neutral "not enough activity"
  *   - Consistent visual family with Trust Decay (Phase 3): same icon style
  */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, AlertTriangle, TrendingDown, TrendingUp, Minus, Eye, X } from 'lucide-react';
 import type { DriftScore } from '../api';
@@ -52,19 +53,65 @@ function driftSeverity(gap: number, confidence: DriftScore['confidence']): {
   };
 }
 
+interface PopupCoords {
+  x: number;
+  y: number;
+  openUp: boolean;
+}
+
+const POPUP_WIDTH = 256; // w-64
+const POPUP_PADDING = 8;
+
+function calcPopupCoords(badgeRect: DOMRect): PopupCoords {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const openUp = vh - badgeRect.bottom < 200;
+
+  let x = badgeRect.left;
+  if (x + POPUP_WIDTH > vw - POPUP_PADDING) {
+    x = vw - POPUP_WIDTH - POPUP_PADDING;
+  }
+  if (x < POPUP_PADDING) x = POPUP_PADDING;
+
+  const y = openUp ? badgeRect.top - 8 : badgeRect.bottom + 8;
+  return { x, y, openUp };
+}
+
 const DriftBadge: React.FC<DriftBadgeProps> = ({ drift, isDark = true }) => {
   const [expanded, setExpanded] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<PopupCoords>({ x: 0, y: 0, openUp: false });
+  const badgeRef = useRef<HTMLButtonElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  const updateCoords = useCallback(() => {
+    if (!badgeRef.current) return;
+    setCoords(calcPopupCoords(badgeRef.current.getBoundingClientRect()));
+  }, []);
 
   // Close on outside click
   useEffect(() => {
     if (!expanded) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setExpanded(false);
+      if (
+        badgeRef.current?.contains(e.target as Node) === false &&
+        popupRef.current?.contains(e.target as Node) === false
+      ) setExpanded(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [expanded]);
+
+  // Reposition on scroll/resize
+  useEffect(() => {
+    if (!expanded) return;
+    const refresh = () => updateCoords();
+    window.addEventListener('scroll', refresh, true);
+    window.addEventListener('resize', refresh);
+    return () => {
+      window.removeEventListener('scroll', refresh, true);
+      window.removeEventListener('resize', refresh);
+    };
+  }, [expanded, updateCoords]);
 
   const { gap, selfReported, inferredReal, confidence, explanation, signals } = drift;
   const sev = driftSeverity(gap, confidence);
@@ -73,48 +120,37 @@ const DriftBadge: React.FC<DriftBadgeProps> = ({ drift, isDark = true }) => {
   // Don't render at all if sparse and gap is 0 (brand new task)
   if (isSparse && Math.abs(gap) < 1) return null;
 
-  return (
-    <div ref={ref} className="relative inline-block" onClick={e => e.stopPropagation()}>
-      {/* Compact badge — always visible */}
-      <motion.button
-        onClick={() => setExpanded(v => !v)}
-        whileHover={{ scale: 1.12 }}
-        whileTap={{ scale: 0.9 }}
-        className="flex items-center gap-1 px-1.5 py-0.5 rounded-full"
-        style={{
-          background: sev.bg,
-          border: `1px solid ${sev.border}`,
-          color: sev.color,
-        }}
-        title={isSparse ? 'Not enough activity to estimate' : `Behavioral Drift: reported ${selfReported}% vs estimated ${inferredReal}%`}
-      >
-        <Activity size={8} />
-        {!isSparse && (
-          <span className="font-mono text-[9px] font-bold">
-            {gap > 0 ? '+' : ''}{gap}%
-          </span>
-        )}
-        <span className="text-[8px] font-mono opacity-70">{sev.icon}</span>
-      </motion.button>
+  const portalStyle: React.CSSProperties = {
+    position: 'fixed',
+    zIndex: 99999,
+    width: POPUP_WIDTH,
+    ...(coords.openUp
+      ? { bottom: window.innerHeight - coords.y, top: 'auto' }
+      : { top: coords.y, bottom: 'auto' }),
+    left: coords.x,
+  };
 
-      {/* Expanded panel */}
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.92, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.92, y: -4 }}
-            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute bottom-full left-0 mb-2 z-50 w-64 rounded-xl overflow-hidden"
-            style={{
-              background: isDark ? 'rgba(13,17,23,0.97)' : 'rgba(248,250,252,0.97)',
-              border: `1px solid ${sev.border}`,
-              boxShadow: isDark
-                ? `0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px ${sev.border}`
-                : `0 8px 24px rgba(0,0,0,0.12)`,
-              backdropFilter: 'blur(20px)',
-            }}
-          >
+  const popup = (
+    <AnimatePresence>
+      {expanded && (
+        <motion.div
+          ref={popupRef}
+          initial={{ opacity: 0, scale: 0.92, y: coords.openUp ? 4 : -4 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.92, y: coords.openUp ? 4 : -4 }}
+          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+          className="rounded-xl overflow-hidden"
+          style={{
+            ...portalStyle,
+            background: isDark ? 'rgba(13,17,23,0.97)' : 'rgba(248,250,252,0.97)',
+            border: `1px solid ${sev.border}`,
+            boxShadow: isDark
+              ? `0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px ${sev.border}`
+              : `0 8px 24px rgba(0,0,0,0.12)`,
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+          }}
+        >
             {/* Header */}
             <div className="flex items-center justify-between px-3 py-2"
               style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}` }}>
@@ -249,7 +285,39 @@ const DriftBadge: React.FC<DriftBadgeProps> = ({ drift, isDark = true }) => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+  );
+
+  return (
+    <span className="inline-block" onClick={e => e.stopPropagation()}>
+      {/* Compact badge — always visible */}
+      <motion.button
+        ref={badgeRef}
+        onClick={() => {
+          updateCoords();
+          setExpanded(v => !v);
+        }}
+        whileHover={{ scale: 1.12 }}
+        whileTap={{ scale: 0.9 }}
+        className="flex items-center gap-1 px-1.5 py-0.5 rounded-full"
+        style={{
+          background: sev.bg,
+          border: `1px solid ${sev.border}`,
+          color: sev.color,
+        }}
+        title={isSparse ? 'Not enough activity to estimate' : `Behavioral Drift: reported ${selfReported}% vs estimated ${inferredReal}%`}
+      >
+        <Activity size={8} />
+        {!isSparse && (
+          <span className="font-mono text-[9px] font-bold">
+            {gap > 0 ? '+' : ''}{gap}%
+          </span>
+        )}
+        <span className="text-[8px] font-mono opacity-70">{sev.icon}</span>
+      </motion.button>
+
+      {/* Rendered into document.body — escapes overflow:hidden on the task card */}
+      {createPortal(popup, document.body)}
+    </span>
   );
 };
 

@@ -5,78 +5,103 @@
  * GOOGLE_CLOUD_PROJECT is set, falling back to the Gemini Developer API
  * (GEMINI_API_KEY) otherwise.
  *
- * Vertex AI path:  @google-cloud/vertexai  — enterprise AI on Google Cloud
- * Fallback path:   @google/generative-ai   — direct Gemini Developer API
- *
- * This file is the single AI entry point for Velocity. Every feature that
- * calls Gemini goes through getModel() here.
+ * Uses the unified @google/genai SDK which supports both Vertex AI and
+ * the Gemini Developer API with the same interface.
  */
 
-// ── Vertex AI client (lazy-initialized) ──────────────────────────────────────
-let _vertexModel = null;
-let _devModel    = null;
+let _client = null;
 let _usingVertex = false;
 
-function getModel() {
-  // Prefer Vertex AI when Google Cloud project is configured
-  const gcpProject = process.env.GOOGLE_CLOUD_PROJECT;
-  const gcpLocation = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
+function getClient() {
+  if (_client) return { client: _client, isVertex: _usingVertex };
+
+  const isProduction = process.env.NODE_ENV === 'production';
+  const gcpProject  = process.env.GOOGLE_CLOUD_PROJECT;
 
   if (gcpProject && gcpProject !== 'your_gcp_project_id_here') {
-    if (!_vertexModel) {
-      const { VertexAI } = require('@google-cloud/vertexai');
-      const vertexai = new VertexAI({ project: gcpProject, location: gcpLocation });
-      _vertexModel = vertexai.getGenerativeModel({
-        model: 'gemini-2.5-flash',
-        generationConfig: { maxOutputTokens: 8192 },
-      });
-      _usingVertex = true;
-      console.log(`[GeminiService] Using Vertex AI — project: ${gcpProject}, location: ${gcpLocation}`);
-    }
-    return { model: _vertexModel, isVertex: true };
+    const { GoogleGenAI } = require('@google/genai');
+    _client = new GoogleGenAI({
+      vertexai: true,
+      project: gcpProject,
+      location: 'global',
+    });
+    _usingVertex = true;
+    console.log(`[GeminiService] Using Vertex AI (@google/genai) — project: ${gcpProject}, location: global`);
+    return { client: _client, isVertex: true };
   }
 
-  // Fallback: direct Gemini Developer API
-  if (!_devModel) {
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error('No AI backend configured: set GOOGLE_CLOUD_PROJECT (Vertex AI) or GEMINI_API_KEY');
-    }
-    const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    _devModel = gemini.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
-    console.log('[GeminiService] Using Gemini Developer API — gemini-3.1-flash-lite');
+  if (isProduction) {
+    throw new Error(
+      '[GeminiService] Production requires Vertex AI. ' +
+      'Set GOOGLE_CLOUD_PROJECT to your GCP project ID.'
+    );
   }
-  return { model: _devModel, isVertex: false };
+
+  // Development fallback: Gemini Developer API
+  const { GoogleGenAI } = require('@google/genai');
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error('No AI backend configured: set GOOGLE_CLOUD_PROJECT (Vertex AI) or GEMINI_API_KEY (dev only)');
+  }
+  _client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  _usingVertex = false;
+  console.log('[GeminiService] Using Gemini Developer API (@google/genai) — dev only');
+  return { client: _client, isVertex: false };
 }
 
 /**
- * Unified generateContent — works with both Vertex AI and Developer API.
- * Both SDKs expose the same generateContent() shape, but Vertex AI returns
- * result.response.text() via a different path on streaming. We always use
- * non-streaming here so the shape is identical.
+ * Unified generate — works with both Vertex AI and Developer API via @google/genai.
  */
 async function generate(promptOrParts) {
-  const { model, isVertex } = getModel();
+  const { client, isVertex } = getClient();
+  console.log(`[GeminiService] generate() via ${isVertex ? 'Vertex AI' : 'Developer API'}`);
+
+  // Build contents array from prompt
+  let contents;
+  if (typeof promptOrParts === 'string') {
+    contents = [{ role: 'user', parts: [{ text: promptOrParts }] }];
+  } else if (Array.isArray(promptOrParts)) {
+    // Could be parts array or contents array
+    if (promptOrParts[0] && typeof promptOrParts[0] === 'object' && promptOrParts[0].role) {
+      contents = promptOrParts; // already contents
+    } else {
+      contents = [{ role: 'user', parts: promptOrParts.map(p =>
+        typeof p === 'string' ? { text: p } : p
+      )}];
+    }
+  } else if (promptOrParts && promptOrParts.contents) {
+    contents = promptOrParts.contents;
+  } else {
+    contents = [{ role: 'user', parts: [{ text: String(promptOrParts) }] }];
+  }
+
   try {
-    const result = await model.generateContent(promptOrParts);
-    return result.response.text().trim();
+    const response = await client.models.generateContent({
+      model: 'gemini-3.1-flash-lite',
+      contents,
+      config: { maxOutputTokens: 8192 },
+    });
+    return response.text.trim();
   } catch (err) {
-    // If Vertex AI fails (auth, model not found, quota), try falling back to Developer API
-    if (isVertex && process.env.GEMINI_API_KEY) {
-      console.warn('[GeminiService] Vertex AI failed, falling back to Developer API:', err.message);
-      _vertexModel = null; // reset so next call retries Vertex fresh
-      const { GoogleGenerativeAI } = require('@google/generative-ai');
-      const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const fallback = gemini.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
-      const result = await fallback.generateContent(promptOrParts);
-      return result.response.text().trim();
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (isVertex && !isProduction && process.env.GEMINI_API_KEY) {
+      console.warn('[GeminiService] Vertex AI failed, falling back to Developer API (dev only):', err.message);
+      _client = null;
+      _usingVertex = false;
+      const { GoogleGenAI } = require('@google/genai');
+      const fallbackClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await fallbackClient.models.generateContent({
+        model: 'gemini-3.1-flash-lite',
+        contents,
+        config: { maxOutputTokens: 8192 },
+      });
+      return response.text.trim();
     }
     throw err;
   }
 }
 
 /**
- * Which backend is active? Used by the health endpoint and Tech Stack page.
+ * Which backend is active? Used by the health endpoint.
  */
 function getAIBackendInfo() {
   const gcpProject = process.env.GOOGLE_CLOUD_PROJECT;
@@ -84,9 +109,9 @@ function getAIBackendInfo() {
     return {
       backend: 'vertex_ai',
       label: 'Vertex AI (Google Cloud)',
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.1-flash-lite',
       project: gcpProject,
-      location: process.env.GOOGLE_CLOUD_LOCATION || 'us-central1',
+      location: 'global',
     };
   }
   return {
@@ -335,7 +360,7 @@ Return ONLY the raw JSON object. No markdown, no explanation.`;
 // ─── 6. Image Vision — Chaos Scanner ─────────────────────────────────────────
 
 async function extractTasksFromImage(base64ImageData, mimeType) {
-  const { model, isVertex } = getModel();
+  const { client } = getClient();
 
   const prompt = `You are extracting tasks from an image (whiteboard, syllabus, screenshot, printed schedule).
 Extract every visible deadline, assignment, class, or to-do item.
@@ -354,27 +379,19 @@ For each task:
 
 Return ONLY a valid JSON array. No markdown, no explanation.`;
 
-  let result;
-  if (isVertex) {
-    // Vertex AI: filePart uses inlineData
-    result = await model.generateContent({
-      contents: [{
-        role: 'user',
-        parts: [
-          { text: prompt },
-          { inlineData: { mimeType, data: base64ImageData } },
-        ],
-      }],
-    });
-  } else {
-    // Developer API
-    result = await model.generateContent([
-      prompt,
-      { inlineData: { mimeType, data: base64ImageData } },
-    ]);
-  }
+  const response = await client.models.generateContent({
+    model: 'gemini-3.1-flash-lite',
+    contents: [{
+      role: 'user',
+      parts: [
+        { text: prompt },
+        { inlineData: { mimeType, data: base64ImageData } },
+      ],
+    }],
+    config: { maxOutputTokens: 8192 },
+  });
 
-  const responseText = result.response.text().trim();
+  const responseText = response.text.trim();
   try {
     const tasks = extractJSON(responseText);
     if (!Array.isArray(tasks)) throw new Error('Gemini returned non-array response');

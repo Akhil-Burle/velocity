@@ -182,10 +182,22 @@ async function start() {
   }
 
   console.log('');
-  if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
-    console.warn('  ⚠️  GEMINI_API_KEY not set — AI features will use fallback templates');
+  if (process.env.NODE_ENV === 'production') {
+    // In production, Vertex AI is mandatory. Fail loudly if not configured.
+    if (!process.env.GOOGLE_CLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT === 'your-gcp-project-id') {
+      console.error('  ❌ FATAL: GOOGLE_CLOUD_PROJECT is not set.');
+      console.error('     All Gemini calls require Vertex AI in production.');
+      console.error('     Set GOOGLE_CLOUD_PROJECT to your GCP project ID and redeploy.');
+      process.exit(1);
+    }
+    console.log(`  ✅ Vertex AI configured — project: ${process.env.GOOGLE_CLOUD_PROJECT}, location: ${process.env.GOOGLE_CLOUD_LOCATION || 'us-central1'}`);
   } else {
-    console.log('  ✅ Gemini API key configured');
+    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
+      console.warn('  ⚠️  GEMINI_API_KEY not set — AI features will use fallback templates');
+    } else {
+      const hasVertex = process.env.GOOGLE_CLOUD_PROJECT && process.env.GOOGLE_CLOUD_PROJECT !== 'your-gcp-project-id';
+      console.log(`  ✅ AI backend: ${hasVertex ? `Vertex AI (${process.env.GOOGLE_CLOUD_PROJECT})` : 'Gemini Developer API (dev mode)'}`);
+    }
   }
 
   const mongoUri = process.env.MONGODB_URI;

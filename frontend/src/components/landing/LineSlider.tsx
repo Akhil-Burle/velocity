@@ -12,7 +12,7 @@
 import { useEffect, useRef } from 'react';
 import { computeFillRatio } from './LineSlider';
 
-const SECTION_IDS = ['hero', 'feature-showcase', 'stats', 'narrative', 'testimonial', 'cta'];
+const SECTION_IDS = ['hero', 'problem', 'behavioral-velocity', 'agent-depth', 'features', 'google-tech', 'cta'];
 
 const TRACK_W = 32;   // SVG viewport width
 const TRACK_H = '100vh';

@@ -7,14 +7,14 @@
  * Safe to re-run anytime — full wipe + reseed on every run.
  *
  * What a judge sees on demo login:
- *   Dashboard  : 9 active tasks (3 RED / 3 AMBER / 3 GREEN), 3 rescheduled,
- *                5 completed, burnout chart in the red, velocity score showing
- *                real struggle, Panic Mode + Negotiate buttons visible, Ultimatum
+ *   Dashboard  : 9 active tasks (2 RED / 4 AMBER / 3 GREEN), 3 rescheduled,
+ *                5 completed, burnout chart showing real struggle, velocity score showing
+ *                real pressure, Panic Mode + Negotiate buttons visible, Ultimatum
  *                trigger seeded.
- *   Agent Log  : 20+ entries spanning every feature (chains, policy, drift,
+ *   Agent Log  : 40+ entries spanning 14 days of history (chains, policy, drift,
  *                omnibar, rebalance, panic, negotiate, triage, ultimatum)
- *   Insights   : 16 check-ins across 6 tasks → all 6 DNA axes populated;
- *                archetype "The Sprinter"; calibration table with 4 types
+ *   Insights   : 47 check-ins across 8 tasks → all 6 DNA axes populated with 14 days
+ *                of data; archetype "The Sprinter"; calibration table with 4 types
  *   Gamification: Level 7 "Vanguard", 5,200 VC, 14-day streak, achievements
  *                 correctly keyed to match ACHIEVEMENTS catalog
  *   Goals      : 4 goals with linked tasks and real progress
@@ -93,16 +93,16 @@ function buildTasks(userId) {
   const tasks = [];
   const ids = {};
 
-  // ── T1 · RED · CODE · 11h · PANIC eligible ────────────────────────────────
+  // ── T1 · RED · CODE · 28h · PANIC eligible ───────────────────────────────
   ids.t1 = uuidv4();
   tasks.push({
     userId, id: ids.t1,
     taskName: 'OS Assignment 4 — Virtual Memory Simulator',
-    deadline: hoursFromNow(11), taskType: 'CODE', cognitiveWeight: 'HIGH',
+    deadline: hoursFromNow(28), taskType: 'CODE', cognitiveWeight: 'HIGH',
     selfOwned: true, recipientName: null,
-    currentPaceHoursPerDay: calcPace('HIGH', hoursFromNow(11)), status: 'RED',
+    currentPaceHoursPerDay: calcPace('HIGH', hoursFromNow(28)), status: 'RED',
     energyLevel: 'Deep Focus', estimatedDuration: 120,
-    driftExplanation: 'Not started. 11 hours until submission. Clock-replacement policy implementation still missing. Activate Panic Mode — AI will generate a complete working C scaffold.',
+    driftExplanation: 'Only 8% done with ~28 hours left. Clock-replacement policy implementation still missing. You need ~4h of focused work today. Panic Mode will generate a working C scaffold.',
     hotStartContent: '', negotiatedDraft: '',
     completionPercent: 8, sparkline: sparkline('crash', 80), isRescheduled: false,
     rawInput: 'OS assignment 4 virtual memory simulator due tomorrow 8am',
@@ -119,19 +119,19 @@ function buildTasks(userId) {
     mode: 'normal', createdAt: daysAgo(3), updatedAt: hoursAgo(2),
   });
 
-  // ── T2 · RED · WRITING · 18h · Negotiate eligible (Recruiting Team) ───────
+  // ── T2 · AMBER · WRITING · 2.5 days · Negotiate eligible (Recruiting Team) ─
   ids.t2 = uuidv4();
   tasks.push({
     userId, id: ids.t2,
     taskName: 'Systems Design Interview Write-up — Meta Internship',
-    deadline: hoursFromNow(18), taskType: 'WRITING', cognitiveWeight: 'HIGH',
+    deadline: daysFromNow(2.5), taskType: 'WRITING', cognitiveWeight: 'HIGH',
     selfOwned: false, recipientName: 'Recruiting Team',
-    currentPaceHoursPerDay: calcPace('HIGH', hoursFromNow(18)), status: 'RED',
+    currentPaceHoursPerDay: calcPace('HIGH', daysFromNow(2.5)), status: 'AMBER',
     energyLevel: 'Deep Focus', estimatedDuration: 90,
-    driftExplanation: '22% complete. Submission window closes in 18h. Three system design answers still blank. Negotiate a 24h extension — the portal deadline is a soft cutoff, not auto-rejected.',
+    driftExplanation: '22% complete with 2.5 days left. Three design answers still pending — about 1.5–2h of focused writing per day will get you there. Negotiate button ready if schedule tightens.',
     hotStartContent: '', negotiatedDraft: '',
-    completionPercent: 22, sparkline: sparkline('crash', 65), isRescheduled: false,
-    rawInput: 'Meta internship systems design take-home due tomorrow night',
+    completionPercent: 22, sparkline: sparkline('zigzag', 52), isRescheduled: false,
+    rawInput: 'Meta internship systems design take-home due in 2 days',
     creditValue: 280, creditsAwarded: false,
     subtasks: [
       sub('Design URL shortener (scalability focus)', 60, true),
@@ -600,55 +600,124 @@ function buildHabits(userId) {
 
 
 // ═════════════════════════════════════════════════════════════════════════════
-// CHECK-INS — 16 across 6 tasks showing trust score evolution
+// CHECK-INS — 40+ entries across 14 days and all active tasks
+// Covers every DNA axis: CODE, WRITING, OTHER, DIAGRAM
 // ═════════════════════════════════════════════════════════════════════════════
 function buildCheckIns(userId, tasks) {
   const ids = tasks._ids;
-  return [
-    // T3 Capstone — consistently overestimating (trust score declining 96→58)
-    { userId, id: uuidv4(), taskId: ids.t3, timestamp: daysAgo(9),
-      selfReportText: 'Good progress on WebSocket server, feel about 20% done', selfReportPercent: 20, trustScore: 96 },
-    { userId, id: uuidv4(), taskId: ids.t3, timestamp: daysAgo(6),
-      selfReportText: 'Fixed most bugs, maybe 40% now but race condition still hits', selfReportPercent: 40, trustScore: 88 },
-    { userId, id: uuidv4(), taskId: ids.t3, timestamp: daysAgo(3),
-      selfReportText: 'Should be 50% — integration tests failing a lot though', selfReportPercent: 50, trustScore: 71 },
-    { userId, id: uuidv4(), taskId: ids.t3, timestamp: hoursAgo(6),
-      selfReportText: 'I said 60% but honestly the OT implementation is a mess — probably 34% real', selfReportPercent: 60, trustScore: 58 },
+  const ci = [];
 
-    // T5 Raft — honest and accurate (trust 97→99)
-    { userId, id: uuidv4(), taskId: ids.t5, timestamp: daysAgo(7),
-      selfReportText: 'Leader election done, log replication 70% through', selfReportPercent: 38, trustScore: 97 },
-    { userId, id: uuidv4(), taskId: ids.t5, timestamp: daysAgo(4),
-      selfReportText: 'Replication works, now debugging split-brain edge case', selfReportPercent: 48, trustScore: 99 },
-    { userId, id: uuidv4(), taskId: ids.t5, timestamp: hoursAgo(10),
-      selfReportText: 'Split-brain fix in progress, tests passing at 48% subtask mark', selfReportPercent: 48, trustScore: 98 },
+  // ── T3 Capstone (CODE) — 9 check-ins over 10 days, trust declining 96→58 ─
+  ci.push({ userId, id: uuidv4(), taskId: ids.t3, timestamp: daysAgo(10),
+    selfReportText: 'Just kicked off — WebSocket server scaffolded, feel about 10% in', selfReportPercent: 10, trustScore: 99 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t3, timestamp: daysAgo(9),
+    selfReportText: 'Good progress on WebSocket server, feel about 20% done', selfReportPercent: 20, trustScore: 96 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t3, timestamp: daysAgo(7),
+    selfReportText: 'Race condition still annoying but making progress, maybe 30%', selfReportPercent: 30, trustScore: 92 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t3, timestamp: daysAgo(6),
+    selfReportText: 'Fixed most bugs, maybe 40% now but race condition still hits', selfReportPercent: 40, trustScore: 88 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t3, timestamp: daysAgo(5),
+    selfReportText: 'Wrote some tests, feeling 45% but OT is hard', selfReportPercent: 45, trustScore: 82 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t3, timestamp: daysAgo(4),
+    selfReportText: 'Probably 48%? CRDT theory is trickier than I expected', selfReportPercent: 48, trustScore: 77 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t3, timestamp: daysAgo(3),
+    selfReportText: 'Should be 50% — integration tests failing a lot though', selfReportPercent: 50, trustScore: 71 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t3, timestamp: daysAgo(1),
+    selfReportText: 'Told teammate 55%, honestly might be less', selfReportPercent: 55, trustScore: 64 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t3, timestamp: hoursAgo(6),
+    selfReportText: 'I said 60% but honestly the OT implementation is a mess — probably 34% real', selfReportPercent: 60, trustScore: 58 });
 
-    // T6 ML Paper — stale (last check-in 3 days ago), trust gap 14%
-    { userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(12),
-      selfReportText: 'Abstract done, intro half-written — about 25%', selfReportPercent: 25, trustScore: 93 },
-    { userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(8),
-      selfReportText: 'Lit review and intro done, methodology outlined — 45%?', selfReportPercent: 45, trustScore: 87 },
-    { userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(5),
-      selfReportText: 'Experiments running, results section started. Feeling 60%', selfReportPercent: 60, trustScore: 72 },
-    { userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(3),
-      selfReportText: 'Honest: results section incomplete, more like 55%. Stopped faking it', selfReportPercent: 55, trustScore: 84 },
+  // ── T5 Raft (CODE) — 7 check-ins, honest and accurate, trust 97→99 ───────
+  ci.push({ userId, id: uuidv4(), taskId: ids.t5, timestamp: daysAgo(8),
+    selfReportText: 'Set up the project skeleton and read the Raft paper again. 10% in.', selfReportPercent: 10, trustScore: 99 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t5, timestamp: daysAgo(7),
+    selfReportText: 'Leader election done, log replication 70% through', selfReportPercent: 38, trustScore: 97 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t5, timestamp: daysAgo(6),
+    selfReportText: 'AppendEntries RPC wired up, feeling 42%', selfReportPercent: 42, trustScore: 98 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t5, timestamp: daysAgo(5),
+    selfReportText: 'Log replication mostly works, hitting split-brain edge case', selfReportPercent: 45, trustScore: 97 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t5, timestamp: daysAgo(4),
+    selfReportText: 'Replication works, now debugging split-brain edge case', selfReportPercent: 48, trustScore: 99 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t5, timestamp: daysAgo(2),
+    selfReportText: 'Still 48%, split-brain is harder than expected but I see the fix', selfReportPercent: 48, trustScore: 99 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t5, timestamp: hoursAgo(10),
+    selfReportText: 'Split-brain fix in progress, tests passing at 48% subtask mark', selfReportPercent: 48, trustScore: 98 });
 
-    // T4 Grading — accurate and consistent
-    { userId, id: uuidv4(), taskId: ids.t4, timestamp: daysAgo(3),
-      selfReportText: 'Graded 8 submissions, going slowly but steady', selfReportPercent: 21, trustScore: 98 },
-    { userId, id: uuidv4(), taskId: ids.t4, timestamp: hoursAgo(8),
-      selfReportText: 'Up to 12 graded — each takes about 7 min', selfReportPercent: 30, trustScore: 96 },
+  // ── T6 ML Paper (WRITING) — 8 check-ins, stale last 3 days, trust gap 14% ─
+  ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(14),
+    selfReportText: 'Outlined the paper structure and started abstract. 10%.', selfReportPercent: 10, trustScore: 99 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(12),
+    selfReportText: 'Abstract done, intro half-written — about 25%', selfReportPercent: 25, trustScore: 93 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(10),
+    selfReportText: 'Introduction done. Related work section about 70% through. 35%', selfReportPercent: 35, trustScore: 91 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(8),
+    selfReportText: 'Lit review and intro done, methodology outlined — 45%?', selfReportPercent: 45, trustScore: 87 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(7),
+    selfReportText: 'Methodology section drafted, starting experiments write-up. 48%', selfReportPercent: 48, trustScore: 89 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(5),
+    selfReportText: 'Experiments running, results section started. Feeling 60%', selfReportPercent: 60, trustScore: 72 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(4),
+    selfReportText: 'Results tables half-done. Stuck waiting for one experiment run. 58%', selfReportPercent: 58, trustScore: 78 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(3),
+    selfReportText: 'Honest: results section incomplete, more like 55%. Stopped faking it', selfReportPercent: 55, trustScore: 84 });
 
-    // T1 OS — brutal honesty
-    { userId, id: uuidv4(), taskId: ids.t1, timestamp: daysAgo(2),
-      selfReportText: 'Only read the spec. Clock algo not started. I am not okay.', selfReportPercent: 5, trustScore: 99 },
-    { userId, id: uuidv4(), taskId: ids.t1, timestamp: hoursAgo(2),
-      selfReportText: 'Frame table struct done, clock pointer logic in progress. 8% maybe', selfReportPercent: 8, trustScore: 97 },
+  // ── T4 Grading (OTHER) — 5 check-ins over 5 days ────────────────────────
+  ci.push({ userId, id: uuidv4(), taskId: ids.t4, timestamp: daysAgo(5),
+    selfReportText: 'Started the rubric, graded 3 submissions. ~8%', selfReportPercent: 8, trustScore: 99 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t4, timestamp: daysAgo(4),
+    selfReportText: 'Up to 5 graded, slow going today — about 13%', selfReportPercent: 13, trustScore: 98 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t4, timestamp: daysAgo(3),
+    selfReportText: 'Graded 8 submissions, going slowly but steady', selfReportPercent: 21, trustScore: 98 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t4, timestamp: daysAgo(2),
+    selfReportText: 'Got to 10 graded — finding it hard to focus with OS stuff looming', selfReportPercent: 26, trustScore: 97 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t4, timestamp: hoursAgo(8),
+    selfReportText: 'Up to 12 graded — each takes about 7 min', selfReportPercent: 30, trustScore: 96 });
 
-    // T2 Meta Interview — recent, honest
-    { userId, id: uuidv4(), taskId: ids.t2, timestamp: hoursAgo(4),
-      selfReportText: 'First answer (URL shortener) done. Sitting at 22% with 18h left. Not good.', selfReportPercent: 22, trustScore: 98 },
-  ];
+  // ── T1 OS Assignment (CODE) — 5 check-ins, brutal honesty ───────────────
+  ci.push({ userId, id: uuidv4(), taskId: ids.t1, timestamp: daysAgo(3),
+    selfReportText: 'Read the spec. This is going to be painful. 2% maybe.', selfReportPercent: 2, trustScore: 99 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t1, timestamp: daysAgo(2),
+    selfReportText: 'Only read the spec. Clock algo not started. I am not okay.', selfReportPercent: 5, trustScore: 99 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t1, timestamp: daysAgo(1),
+    selfReportText: 'Still barely started. 5%. Kept getting pulled into capstone stuff.', selfReportPercent: 5, trustScore: 99 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t1, timestamp: hoursAgo(5),
+    selfReportText: 'Frame table struct finally done, clock pointer coded, ~8%', selfReportPercent: 8, trustScore: 98 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t1, timestamp: hoursAgo(2),
+    selfReportText: 'Frame table struct done, clock pointer logic in progress. 8% maybe', selfReportPercent: 8, trustScore: 97 });
+
+  // ── T2 Meta Interview (WRITING) — 4 check-ins ───────────────────────────
+  ci.push({ userId, id: uuidv4(), taskId: ids.t2, timestamp: daysAgo(4),
+    selfReportText: 'Got the take-home assignment link. Read the questions. 5%', selfReportPercent: 5, trustScore: 99 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t2, timestamp: daysAgo(2),
+    selfReportText: 'Outlined all three answers. 15% maybe.', selfReportPercent: 15, trustScore: 98 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t2, timestamp: daysAgo(1),
+    selfReportText: 'URL shortener answer drafted but needs polish. 18%', selfReportPercent: 18, trustScore: 98 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t2, timestamp: hoursAgo(4),
+    selfReportText: 'First answer (URL shortener) done. Sitting at 22% with 18h left. Tight.', selfReportPercent: 22, trustScore: 98 });
+
+  // ── T7 Hackathon (CODE) — 5 check-ins ───────────────────────────────────
+  ci.push({ userId, id: uuidv4(), taskId: ids.t7, timestamp: daysAgo(12),
+    selfReportText: 'Project kicked off, Next.js scaffold up. 10%.', selfReportPercent: 10, trustScore: 99 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t7, timestamp: daysAgo(9),
+    selfReportText: 'Gemini API connected, basic brain dump flow works. 35%', selfReportPercent: 35, trustScore: 97 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t7, timestamp: daysAgo(6),
+    selfReportText: 'Rescheduling feature in, UI mostly polished. 60%', selfReportPercent: 60, trustScore: 98 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t7, timestamp: daysAgo(3),
+    selfReportText: 'Onboarding flow added, feeling about 70%', selfReportPercent: 70, trustScore: 99 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t7, timestamp: daysAgo(1),
+    selfReportText: 'Just demo video and submission form left. 71%', selfReportPercent: 71, trustScore: 99 });
+
+  // ── T9 Architecture Diagram (DIAGRAM) — 4 check-ins ─────────────────────
+  ci.push({ userId, id: uuidv4(), taskId: ids.t9, timestamp: daysAgo(7),
+    selfReportText: 'Started block diagram for system overview. 20%', selfReportPercent: 20, trustScore: 99 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t9, timestamp: daysAgo(5),
+    selfReportText: 'Block diagram done and reviewed with teammate. 40%', selfReportPercent: 40, trustScore: 99 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t9, timestamp: daysAgo(3),
+    selfReportText: 'Blocked on the sequence diagrams — need to confirm the flow first. 50%', selfReportPercent: 50, trustScore: 98 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t9, timestamp: daysAgo(1),
+    selfReportText: 'Overview diagram fully done, WS sequence started. 55%', selfReportPercent: 55, trustScore: 99 });
+
+  return ci;
 }
 
 
@@ -663,43 +732,69 @@ function buildCheckIns(userId, tasks) {
 function buildGamification(userId) {
   const ledger = [];
 
-  // 35 historical entries spanning 30 days — realistic CS student cadence
+  // 55+ historical entries spanning 30 days — realistic CS student cadence
   const ACTIONS = [
-    { action: 'task_complete',  label: 'Task completed — HackMIT Auditor',    amount: 310, daysBack: 29 },
-    { action: 'panic_resolved', label: 'Panic Mode cleared',                  amount: 120, daysBack: 28 },
-    { action: 'checkin',        label: 'Progress check-in',                   amount: 25,  daysBack: 28 },
-    { action: 'day_rebalanced', label: 'Day rebalanced',                      amount: 35,  daysBack: 27 },
-    { action: 'triage_run',     label: 'Triage executed',                     amount: 40,  daysBack: 26 },
-    { action: 'checkin',        label: 'Progress check-in',                   amount: 25,  daysBack: 25 },
-    { action: 'task_complete',  label: 'Task completed — OS Lab 3 (ext2)',     amount: 210, daysBack: 24 },
-    { action: 'panic_resolved', label: 'Panic Mode cleared — ext2 inode',     amount: 150, daysBack: 24 },
-    { action: 'checkin',        label: 'Progress check-in',                   amount: 30,  daysBack: 23 },
-    { action: 'day_rebalanced', label: 'Day rebalanced',                      amount: 30,  daysBack: 22 },
-    { action: 'checkin',        label: 'Progress check-in',                   amount: 25,  daysBack: 21 },
-    { action: 'triage_run',     label: 'Triage executed',                     amount: 40,  daysBack: 20 },
-    { action: 'task_complete',  label: 'Task completed — Auth API',           amount: 240, daysBack: 18 },
-    { action: 'checkin',        label: 'Progress check-in',                   amount: 25,  daysBack: 17 },
-    { action: 'day_rebalanced', label: 'Day rebalanced',                      amount: 35,  daysBack: 16 },
-    { action: 'task_complete',  label: 'Task completed — Midterm Prep',       amount: 190, daysBack: 14 },
-    { action: 'panic_resolved', label: 'Panic Mode cleared',                  amount: 90,  daysBack: 14 },
-    { action: 'checkin',        label: 'Progress check-in',                   amount: 25,  daysBack: 13 },
-    { action: 'triage_run',     label: 'Triage executed',                     amount: 40,  daysBack: 12 },
-    { action: 'checkin',        label: 'Progress check-in',                   amount: 30,  daysBack: 11 },
-    { action: 'day_rebalanced', label: 'Day rebalanced',                      amount: 30,  daysBack: 10 },
-    { action: 'checkin',        label: 'Progress check-in',                   amount: 25,  daysBack: 9  },
-    { action: 'panic_resolved', label: 'Panic Mode cleared',                  amount: 120, daysBack: 8  },
-    { action: 'triage_run',     label: 'Triage executed',                     amount: 40,  daysBack: 7  },
-    { action: 'checkin',        label: 'Progress check-in',                   amount: 25,  daysBack: 6  },
-    { action: 'day_rebalanced', label: 'Day rebalanced',                      amount: 35,  daysBack: 5  },
-    { action: 'checkin',        label: 'Progress check-in',                   amount: 25,  daysBack: 4  },
-    { action: 'triage_run',     label: 'Triage executed',                     amount: 40,  daysBack: 3  },
-    { action: 'checkin',        label: 'Progress check-in',                   amount: 30,  daysBack: 3  },
-    { action: 'day_rebalanced', label: 'Day rebalanced (autonomous)',         amount: 35,  daysBack: 2  },
-    { action: 'checkin',        label: 'Progress check-in',                   amount: 25,  daysBack: 2  },
-    { action: 'triage_run',     label: 'Triage executed',                     amount: 40,  daysBack: 1  },
-    { action: 'panic_resolved', label: 'Panic Mode activated — OS Assignment',amount: 120, daysBack: 0  },
-    { action: 'day_rebalanced', label: 'Day rebalanced (autonomous)',         amount: 35,  daysBack: 0  },
-    { action: 'checkin',        label: 'Progress check-in',                   amount: 25,  daysBack: 0  },
+    { action: 'task_complete',  label: 'Task completed — HackMIT Auditor',         amount: 310, daysBack: 29 },
+    { action: 'panic_resolved', label: 'Panic Mode cleared',                        amount: 120, daysBack: 28 },
+    { action: 'checkin',        label: 'Progress check-in — Capstone',              amount: 25,  daysBack: 28 },
+    { action: 'day_rebalanced', label: 'Day rebalanced',                            amount: 35,  daysBack: 27 },
+    { action: 'triage_run',     label: 'Triage executed',                           amount: 40,  daysBack: 26 },
+    { action: 'checkin',        label: 'Progress check-in — ML Paper',              amount: 25,  daysBack: 26 },
+    { action: 'checkin',        label: 'Progress check-in — Raft',                  amount: 25,  daysBack: 25 },
+    { action: 'task_complete',  label: 'Task completed — OS Lab 3 (ext2)',          amount: 210, daysBack: 24 },
+    { action: 'panic_resolved', label: 'Panic Mode cleared — ext2 inode',           amount: 150, daysBack: 24 },
+    { action: 'checkin',        label: 'Progress check-in — Capstone',              amount: 30,  daysBack: 24 },
+    { action: 'day_rebalanced', label: 'Day rebalanced',                            amount: 30,  daysBack: 23 },
+    { action: 'checkin',        label: 'Progress check-in — ML Paper',              amount: 25,  daysBack: 23 },
+    { action: 'checkin',        label: 'Progress check-in — Hackathon',             amount: 25,  daysBack: 22 },
+    { action: 'triage_run',     label: 'Triage executed',                           amount: 40,  daysBack: 22 },
+    { action: 'checkin',        label: 'Progress check-in — Raft',                  amount: 25,  daysBack: 21 },
+    { action: 'day_rebalanced', label: 'Day rebalanced',                            amount: 35,  daysBack: 21 },
+    { action: 'checkin',        label: 'Progress check-in — Capstone',              amount: 25,  daysBack: 20 },
+    { action: 'triage_run',     label: 'Triage executed',                           amount: 40,  daysBack: 20 },
+    { action: 'task_complete',  label: 'Task completed — Auth API',                 amount: 240, daysBack: 18 },
+    { action: 'checkin',        label: 'Progress check-in — ML Paper',              amount: 25,  daysBack: 18 },
+    { action: 'day_rebalanced', label: 'Day rebalanced',                            amount: 35,  daysBack: 18 },
+    { action: 'checkin',        label: 'Progress check-in — Hackathon',             amount: 25,  daysBack: 17 },
+    { action: 'checkin',        label: 'Progress check-in — Raft',                  amount: 30,  daysBack: 16 },
+    { action: 'day_rebalanced', label: 'Day rebalanced',                            amount: 30,  daysBack: 16 },
+    { action: 'task_complete',  label: 'Task completed — Midterm Prep',             amount: 190, daysBack: 14 },
+    { action: 'panic_resolved', label: 'Panic Mode cleared',                        amount: 90,  daysBack: 14 },
+    { action: 'checkin',        label: 'Progress check-in — Capstone',              amount: 25,  daysBack: 14 },
+    { action: 'checkin',        label: 'Progress check-in — ML Paper',              amount: 25,  daysBack: 13 },
+    { action: 'triage_run',     label: 'Triage executed',                           amount: 40,  daysBack: 12 },
+    { action: 'checkin',        label: 'Progress check-in — Hackathon',             amount: 30,  daysBack: 12 },
+    { action: 'day_rebalanced', label: 'Day rebalanced',                            amount: 30,  daysBack: 11 },
+    { action: 'checkin',        label: 'Progress check-in — Raft',                  amount: 25,  daysBack: 11 },
+    { action: 'checkin',        label: 'Progress check-in — Capstone',              amount: 25,  daysBack: 10 },
+    { action: 'day_rebalanced', label: 'Day rebalanced',                            amount: 35,  daysBack: 10 },
+    { action: 'checkin',        label: 'Progress check-in — ML Paper',              amount: 25,  daysBack: 9  },
+    { action: 'panic_resolved', label: 'Panic Mode cleared',                        amount: 120, daysBack: 8  },
+    { action: 'checkin',        label: 'Progress check-in — Architecture Diagram',  amount: 25,  daysBack: 8  },
+    { action: 'triage_run',     label: 'Triage executed',                           amount: 40,  daysBack: 7  },
+    { action: 'checkin',        label: 'Progress check-in — Raft',                  amount: 25,  daysBack: 7  },
+    { action: 'day_rebalanced', label: 'Day rebalanced',                            amount: 35,  daysBack: 6  },
+    { action: 'checkin',        label: 'Progress check-in — Hackathon',             amount: 25,  daysBack: 6  },
+    { action: 'checkin',        label: 'Progress check-in — ML Paper',              amount: 25,  daysBack: 5  },
+    { action: 'checkin',        label: 'Progress check-in — Architecture Diagram',  amount: 25,  daysBack: 5  },
+    { action: 'checkin',        label: 'Progress check-in — TA Grading',            amount: 25,  daysBack: 5  },
+    { action: 'triage_run',     label: 'Triage executed',                           amount: 40,  daysBack: 4  },
+    { action: 'day_rebalanced', label: 'Day rebalanced',                            amount: 35,  daysBack: 4  },
+    { action: 'checkin',        label: 'Progress check-in — Capstone',              amount: 25,  daysBack: 4  },
+    { action: 'checkin',        label: 'Progress check-in — OS Assignment',         amount: 25,  daysBack: 3  },
+    { action: 'triage_run',     label: 'Triage executed',                           amount: 40,  daysBack: 3  },
+    { action: 'checkin',        label: 'Progress check-in — TA Grading',            amount: 30,  daysBack: 3  },
+    { action: 'day_rebalanced', label: 'Day rebalanced (autonomous)',               amount: 35,  daysBack: 2  },
+    { action: 'checkin',        label: 'Progress check-in — ML Paper',              amount: 25,  daysBack: 2  },
+    { action: 'checkin',        label: 'Progress check-in — Hackathon',             amount: 25,  daysBack: 2  },
+    { action: 'checkin',        label: 'Progress check-in — OS Assignment',         amount: 25,  daysBack: 1  },
+    { action: 'triage_run',     label: 'Triage executed',                           amount: 40,  daysBack: 1  },
+    { action: 'checkin',        label: 'Progress check-in — Architecture Diagram',  amount: 25,  daysBack: 1  },
+    { action: 'checkin',        label: 'Progress check-in — Meta Interview',        amount: 25,  daysBack: 1  },
+    { action: 'panic_resolved', label: 'Panic Mode activated — OS Assignment',      amount: 120, daysBack: 0  },
+    { action: 'day_rebalanced', label: 'Day rebalanced (autonomous)',               amount: 35,  daysBack: 0  },
+    { action: 'checkin',        label: 'Progress check-in — Capstone',              amount: 25,  daysBack: 0  },
+    { action: 'checkin',        label: 'Progress check-in — TA Grading',            amount: 25,  daysBack: 0  },
   ];
 
   ACTIONS.forEach(a => {
@@ -730,7 +825,7 @@ function buildGamification(userId) {
     longestStreak: 21,
     lastActiveDate: new Date().toISOString().slice(0, 10),
     tasksCompleted: 5,   // completed tasks in this seed (T13–T16 + HackMIT = 5 complete)
-    checkins: 16,        // matches buildCheckIns count
+    checkins: 47,        // matches buildCheckIns count
     panicResolved: 5,
     greenHolds: 14,
     onTimeCount: 4,
@@ -990,7 +1085,7 @@ function buildAgentLog(userId, tasks) {
     featureKey: 'negotiate',
     title: 'Flagging: would auto-draft extension to Meta Recruiting — cancelled 3× before',
     reasoning: 'Policy memory: you cancelled auto-drafting to recruiting teams 3 times. Downgrading from auto-act to suggestion.',
-    outcome: 'Suggestion surfaced in sidebar. Open Negotiate manually if you want to send.',
+    outcome: 'Suggestion surfaced in sidebar. Open Negotiate manually if you want to request more time.',
     autonomy: 'autonomous', undoable: false, undone: false,
     relatedTaskId: ids.t2, relatedTaskName: 'Systems Design Interview Write-up — Meta Internship',
     metadata: { recipient: 'Recruiting Team', completionPercent: 22, policyDowngraded: true },
@@ -1231,6 +1326,229 @@ function buildAgentLog(userId, tasks) {
     createdAt: minsAgo(10),
   });
 
+  // ─── Historical entries: Days 1–14 back ────────────────────────────────────
+
+  // Day 1 ago
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'rebalance',
+    title: 'Day rebalanced — moved Meta Interview block to afternoon (energy-match)',
+    reasoning: 'Meta Interview is WRITING + HIGH — better fit for post-lunch focus window than early AM.',
+    outcome: 'Swapped Meta Interview (11:30→13:30) and Raft lab (14:00→11:00). Day plan updated.',
+    autonomy: 'autonomous', undoable: false, undone: false,
+    relatedTaskId: ids.t2, relatedTaskName: 'Systems Design Interview Write-up — Meta Internship',
+    metadata: { blocksSwapped: 2 },
+    createdAt: daysAgo(1),
+  });
+
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'checkin',
+    title: 'Check-in on "OS Assignment 4" — still at 5%, no progress since yesterday',
+    reasoning: 'Subtask completion unchanged. Staleness flag triggered. Status holding at RED.',
+    outcome: 'Velocity degradation toast shown. Recommendation: prioritize OS Assignment over portfolio site.',
+    autonomy: 'autonomous', undoable: false, undone: false,
+    relatedTaskId: ids.t1, relatedTaskName: 'OS Assignment 4 — Virtual Memory Simulator',
+    metadata: { selfReported: 5, actual: 5, trustScore: 99 },
+    createdAt: daysAgo(1),
+  });
+
+  // Day 2 ago
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'triage',
+    title: 'Triage: "Apply for 3 More Internships" deferred — lower priority this sprint week',
+    reasoning: 'Internship applications (MEDIUM weight, 18 days out) ranked lowest when compared against OS, Raft, ML Paper.',
+    outcome: 'Task rescheduled 10 days forward. 45 min capacity freed today.',
+    autonomy: 'countdown', undoable: true, undone: false,
+    relatedTaskId: ids.t12, relatedTaskName: 'Apply for 3 More Summer Internships',
+    metadata: { deferredDays: 10, capacityFreed: 45 },
+    createdAt: daysAgo(2),
+  });
+
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'behavioral_drift',
+    title: 'Trust Decay active on "ML Research Paper" — no check-in in 3 days',
+    reasoning: 'Last check-in was 3 days ago. Trust Decay formula reducing displayed progress from 55% toward actual 41%.',
+    outcome: 'Decay bar visible on task card. Recalibrate: submit a check-in to stop decay.',
+    autonomy: 'autonomous', undoable: false, undone: false,
+    relatedTaskId: ids.t6, relatedTaskName: 'ML Research Paper — Contrastive Learning for Low-Resource NLP',
+    metadata: { reportedPercent: 55, decayedPercent: 49, daysSinceCheckin: 3 },
+    createdAt: daysAgo(2),
+  });
+
+  // Day 3 ago
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'rebalance',
+    title: 'Morning briefing: today needs 7.2h — recommended split across 4 tasks',
+    reasoning: '3 high-priority tasks + TA grading fill the day. Raft lab pushed to evening slot.',
+    outcome: 'Capstone → 09:00, ML Paper → 11:30, TA Grading → 14:00, Raft → 18:00.',
+    autonomy: 'autonomous', undoable: false, undone: false,
+    relatedTaskId: null, relatedTaskName: null,
+    metadata: { requiredHours: 7.2, tasksScheduled: 4 },
+    createdAt: daysAgo(3),
+  });
+
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'checkin',
+    title: 'Check-in on "Raft Consensus" — split-brain fix in progress, 48% confirmed',
+    reasoning: 'Self-report matches subtask completion rate. Trust score 99. On track for 5-day deadline.',
+    outcome: 'No action needed. Raft is progressing honestly and on pace.',
+    autonomy: 'autonomous', undoable: false, undone: false,
+    relatedTaskId: ids.t5, relatedTaskName: 'Distributed Systems — Raft Consensus Implementation',
+    metadata: { selfReported: 48, trustScore: 99 },
+    createdAt: daysAgo(3),
+  });
+
+  // Day 4 ago
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'drift_alert',
+    title: 'ML Paper check-in gap growing — last update 4 days ago',
+    reasoning: 'Tasks with 3+ day gaps between check-ins trigger staleness alerts regardless of reported progress.',
+    outcome: 'Staleness warning surfaced. Trust Decay started reducing displayed 60% toward estimated 48%.',
+    autonomy: 'autonomous', undoable: false, undone: false,
+    relatedTaskId: ids.t6, relatedTaskName: 'ML Research Paper — Contrastive Learning for Low-Resource NLP',
+    metadata: { daysSinceCheckin: 4, displayedPercent: 57 },
+    createdAt: daysAgo(4),
+  });
+
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'negotiate',
+    title: 'Extension email drafted for TA grading — Saturday noon target confirmed',
+    reasoning: 'At 7 min/submission pace, 26 remaining = 3.0h. With today\'s full schedule, Saturday noon is realistic.',
+    outcome: 'Draft cached. Negotiate countdown ready on task card.',
+    autonomy: 'assisted', undoable: true, undone: false,
+    relatedTaskId: ids.t4, relatedTaskName: 'Grading Rubric + 38 Student Submissions — TA Shift',
+    metadata: { recipient: 'Prof. Chen', extensionTarget: 'Saturday noon' },
+    createdAt: daysAgo(4),
+  });
+
+  // Day 5 ago
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'checkin',
+    title: 'Check-in on "Hackathon — AI Study Planner" — 70% complete, on track',
+    reasoning: 'UI polished, core Gemini integration solid. Only demo video and submission form remaining.',
+    outcome: 'Status confirmed GREEN. No action needed — 8 days until deadline.',
+    autonomy: 'autonomous', undoable: false, undone: false,
+    relatedTaskId: ids.t7, relatedTaskName: 'Hackathon Submission — AI Study Planner (Google Gemini)',
+    metadata: { selfReported: 70, trustScore: 99 },
+    createdAt: daysAgo(5),
+  });
+
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'rebalance',
+    title: 'Day rebalanced — front-loaded Capstone after detecting late-day burnout yesterday',
+    reasoning: 'Pace engine detected you completed 0 Capstone subtasks after 6 PM yesterday. Moved session to 09:00.',
+    outcome: 'Capstone block shifted to 09:00–11:30. Portfolio site moved to 20:00 (brain-dead slot).',
+    autonomy: 'autonomous', undoable: false, undone: false,
+    relatedTaskId: ids.t3, relatedTaskName: 'Capstone: Real-time Collaboration Module (WebSocket)',
+    metadata: { burnoutDetected: true, blocksMoved: 2 },
+    createdAt: daysAgo(5),
+  });
+
+  // Day 6 ago
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'omnibar',
+    title: 'Omni-Bar created reminder: "Review Raft paper section 5 before tomorrow"',
+    reasoning: 'You said: "remind me to review Raft section 5 tonight" → AI classified as create_reminder.',
+    outcome: 'Reminder set for 19:00 today.',
+    autonomy: 'countdown', undoable: true, undone: false,
+    relatedTaskId: ids.t5, relatedTaskName: 'Distributed Systems — Raft Consensus Implementation',
+    metadata: { utterance: 'remind me to review Raft section 5 tonight', intent: 'create_reminder', origin: 'omnibar' },
+    createdAt: daysAgo(6),
+  });
+
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'triage',
+    title: 'Triage considered "Side Project: Rebuild Blog" — deferred by 2 weeks',
+    reasoning: 'Blog rebuild is LOW cognitive weight and has no hard deadline. With 3 RED tasks this week, it was the obvious deferral candidate.',
+    outcome: 'Blog project moved to rescheduled. 1h capacity freed.',
+    autonomy: 'countdown', undoable: true, undone: false,
+    relatedTaskId: ids.t10, relatedTaskName: 'Side Project: Rebuild Personal Blog with Astro',
+    metadata: { deferredDays: 14, capacityFreed: 60 },
+    createdAt: daysAgo(6),
+  });
+
+  // Day 7 ago
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'panic',
+    title: 'Panic Mode considered for "Capstone WebSocket" — user declined scaffold',
+    reasoning: 'Capstone hit AMBER→RED threshold. Panic Mode offered. User chose to continue manually.',
+    outcome: 'Panic scaffold not generated. User acknowledged risk. Status remains RED.',
+    autonomy: 'assisted', undoable: false, undone: false,
+    relatedTaskId: ids.t3, relatedTaskName: 'Capstone: Real-time Collaboration Module (WebSocket)',
+    metadata: { userDeclined: true },
+    createdAt: daysAgo(7),
+  });
+
+  // Day 8 ago
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'checkin',
+    title: 'Check-in on "Architecture Diagram" — block diagram completed, 40%',
+    reasoning: 'System overview block diagram finished and teammate-reviewed. Sequence diagrams next.',
+    outcome: 'Completion confirmed at 40%. On pace for 12-day deadline.',
+    autonomy: 'autonomous', undoable: false, undone: false,
+    relatedTaskId: ids.t9, relatedTaskName: 'Architecture Diagram — Capstone Final Report',
+    metadata: { selfReported: 40, trustScore: 99 },
+    createdAt: daysAgo(8),
+  });
+
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'rebalance',
+    title: 'Rebalanced after detecting Capstone WebSocket slipping — moved sessions earlier',
+    reasoning: 'Capstone check-in data showed zero subtask progress in 36h. Agent moved next session to 08:30.',
+    outcome: '3 Capstone blocks front-loaded into the next 2 days. Portfolio site deferred.',
+    autonomy: 'autonomous', undoable: false, undone: false,
+    relatedTaskId: ids.t3, relatedTaskName: 'Capstone: Real-time Collaboration Module (WebSocket)',
+    metadata: { blocksRescheduled: 3 },
+    createdAt: daysAgo(8),
+  });
+
+  // Day 9 ago
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'drift_alert',
+    title: 'Capstone drift first detected — self-report 45% vs 32% actual',
+    reasoning: '3 check-ins showing 13% cumulative gap. Trust score dropped to 77. Not yet RED but trending.',
+    outcome: 'Drift warning surfaced on card. Status held at AMBER. Next check-in scheduled in 24h.',
+    autonomy: 'autonomous', undoable: false, undone: false,
+    relatedTaskId: ids.t3, relatedTaskName: 'Capstone: Real-time Collaboration Module (WebSocket)',
+    metadata: { selfReported: 45, actual: 32, trustScore: 77, gap: 13 },
+    createdAt: daysAgo(9),
+  });
+
+  // Day 10 ago
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'omnibar',
+    title: 'Omni-Bar added task: "Fix capstone race condition before sprint demo"',
+    reasoning: 'You said: "add a task to fix the race condition" → AI classified as create_task with high confidence.',
+    outcome: 'Subtask added to Capstone task. Priority: HIGH. Slot: next available deep focus window.',
+    autonomy: 'countdown', undoable: true, undone: false,
+    relatedTaskId: ids.t3, relatedTaskName: 'Capstone: Real-time Collaboration Module (WebSocket)',
+    metadata: { utterance: 'add a task to fix the race condition', intent: 'create_task', confidence: 'high', origin: 'omnibar' },
+    createdAt: daysAgo(10),
+  });
+
+  // Day 12 ago
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'checkin',
+    title: 'Check-in on "ML Research Paper" — abstract done, 25%',
+    reasoning: 'Self-report aligned with subtask completion. Trust score 93. On pace given 14-day runway at the time.',
+    outcome: 'Status GREEN. Recommendation: lock in methodology section by end of week.',
+    autonomy: 'autonomous', undoable: false, undone: false,
+    relatedTaskId: ids.t6, relatedTaskName: 'ML Research Paper — Contrastive Learning for Low-Resource NLP',
+    metadata: { selfReported: 25, trustScore: 93 },
+    createdAt: daysAgo(12),
+  });
+
+  // Day 14 ago
+  entries.push({
+    id: uuidv4(), userId, featureKey: 'rebalance',
+    title: 'Morning briefing: light day — 3 GREEN tasks, recommended "quick wins" mode',
+    reasoning: 'No RED tasks on this day. 3 tasks in GREEN. Recommended tackling portfolio + architecture diagram.',
+    outcome: 'Portfolio site + Architecture Diagram + Hackathon polish scheduled. ML Paper in evening.',
+    autonomy: 'autonomous', undoable: false, undone: false,
+    relatedTaskId: null, relatedTaskName: null,
+    metadata: { requiredHours: 4.5, mode: 'quick_wins', redCount: 0 },
+    createdAt: daysAgo(14),
+  });
+
   return entries;
 }
 
@@ -1327,20 +1645,20 @@ async function seedRichDemoAccount() {
   console.log(`    Failed:    ${failed.length} (via Ultimatum)`);
   console.log(`  Goals:       ${goals.length}`);
   console.log(`  Habits:      ${habits.length} (30 days of history each)`);
-  console.log(`  Check-ins:   ${checkins.length}`);
-  console.log(`  Agent Log:   ${agentLog.length} entries`);
+  console.log('  Check-ins:   ' + checkins.length);
+  console.log('  Agent Log:   ' + agentLog.length + ' entries');
   console.log(`  Policy Mem:  ${policies.length} entries (2 learned + 1 active)`);
   console.log(`  Decision Log: ${decisions.length} Ultimatum resolution`);
   console.log(`  Credits:     ${finalCredits} VC · Level ${level} · ${gam.streak}-day streak`);
   console.log('\n  🎯 Feature demo guarantees:');
   console.log('     Panic Mode:   T1 (OS Assignment) deadline = 11h → RED → Panic button active');
-  console.log('     Negotiate:    T2 (Meta, Recruiting Team) + T4 (TA, Prof. Chen) ready to send');
-  console.log('     Ultimatum:    T1 + T2 = 15h/day in 18h window + T17 failed task in history');
+  console.log('     Negotiate:    T2 (Meta, Recruiting Team, AMBER) + T4 (TA, Prof. Chen) ready to send');
+  console.log('     Ultimatum:    T1 + T3 = RED tasks + T17 failed task in history');
   console.log('     Trust Score:  T3 (Capstone) 4 check-ins, trust 96→58, gap 26% visible');
   console.log('     Trust Decay:  T6 (ML Paper) stale 3 days → Trust Decay bar draining');
   console.log('     Triage:       3 rescheduled tasks show triage history');
   console.log('     Command Day:  6 blocks, 3 RED → autonomous rebalance fires on load');
-  console.log('     DNA Radar:    16 check-ins across 5 task types → all 6 axes populated');
+  console.log('     DNA Radar:    47 check-ins across 8 task types → all 6 axes populated, 14 days history');
   console.log('     Agent Memory: 2 learned behaviors pre-populated in Agent Memory tab');
   console.log('     Achievements: 7 unlocked, keys match ACHIEVEMENTS catalog correctly');
   console.log(`     Leaderboard:  ${finalCredits} VC → meaningful rank position`);

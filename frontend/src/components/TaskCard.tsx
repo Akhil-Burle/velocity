@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, useDragControls } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import {
   Clock, Brain, TrendingUp, HelpCircle, X,
   MessageSquare, Code, FileText, GitBranch, Layers, Check, CheckCircle2,
@@ -11,7 +11,6 @@ import { computePaceMetrics, fmtHours } from '../data';
 import { submitCheckIn, computeDriftScore, DriftScore } from '../api';
 import DriftBadge from './DriftBadge';
 import DeadlinePhysics from './DeadlinePhysics';
-import TrustDecayBar from './TrustDecayBar';
 import InfoTooltip from './InfoTooltip';
 
 // ─── Status config ────────────────────────────────────────────────────────
@@ -58,13 +57,12 @@ interface TaskCardProps {
   onProgressUpdate?: (percent: number) => void;
   onTaskUpdate?: (updatedTask: Task) => void;
   onOpenDetail?: (task: Task) => void;
-  dragControls?: ReturnType<typeof useDragControls>;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────
 
 const TaskCard: React.FC<TaskCardProps> = ({
-  task, isHot, isDark = true, isRescheduled = false, onNegotiate, onHotStart, onMarkComplete, onMarkNotCompleted, onProgressUpdate, onTaskUpdate, onOpenDetail, dragControls,
+  task, isHot, isDark = true, isRescheduled = false, onNegotiate, onHotStart, onMarkComplete, onMarkNotCompleted, onProgressUpdate, onTaskUpdate, onOpenDetail,
 }) => {
   const [whyOpen, setWhyOpen] = useState(false);
   const [completingFlash, setCompletingFlash] = useState(false);
@@ -73,29 +71,17 @@ const TaskCard: React.FC<TaskCardProps> = ({
   const [driftScore, setDriftScore] = useState<DriftScore | null>(null);
   const actionClickedRef = useRef(false);
 
-  // Progress source: subtask ratio if subtasks exist, else manual completionPercent
+  // Track subtask count for the badge
   const hasSubtasks = (task.subtasks?.length ?? 0) > 0;
-  const subtaskDrivenProgress = hasSubtasks
-    ? Math.round((task.subtasks!.filter(s => s.completed).length / task.subtasks!.length) * 100)
-    : null;
-  const [localProgress, setLocalProgress] = useState(
-    subtaskDrivenProgress !== null ? subtaskDrivenProgress : task.completionPercent
-  );
+  const [localProgress, setLocalProgress] = useState(task.completionPercent);
 
-  // Keep localProgress in sync when subtask ticks arrive from the modal
   useEffect(() => {
-    if (subtaskDrivenProgress !== null) {
-      setLocalProgress(subtaskDrivenProgress);
-    }
-  }, [subtaskDrivenProgress]);
+    setLocalProgress(task.completionPercent);
+  }, [task.completionPercent]);
 
-  // Next incomplete subtask (shown on card when subtask-driven)
-  const nextSubtask = hasSubtasks
-    ? task.subtasks!.find(s => !s.completed) ?? null
-    : null;
-
-  // Debounce ref for check-in sync
+  // Debounce ref kept for future check-in use
   const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bottomBarRef = useRef<HTMLDivElement | null>(null);
 
   // Magnetic tilt
   const rotX = useSpring(useMotionValue(0), { stiffness: 180, damping: 18 });
@@ -146,36 +132,6 @@ const TaskCard: React.FC<TaskCardProps> = ({
     if (isComplete || completingFlash) return;
     setCompletingFlash(true);
     setTimeout(() => { onMarkComplete?.(); setCompletingFlash(false); }, 700);
-  };
-
-  // Debounced check-in sync when slider changes
-  const syncCheckIn = useCallback((val: number) => {
-    if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
-    setSyncing(true);
-    syncDebounceRef.current = setTimeout(async () => {
-      try {
-        await submitCheckIn(task.id, `Progress update: ${val}%`, val);
-      } catch {
-        // silently fail — the local state is already updated
-      } finally {
-        setSyncing(false);
-      }
-    }, 1500);
-  }, [task.id]);
-
-  const handleSlider = (e: React.ChangeEvent<HTMLInputElement>) => {
-    e.stopPropagation();
-    const val = Number(e.target.value);
-    setLocalProgress(val);
-    onProgressUpdate?.(val);
-    syncCheckIn(val);
-    // Auto-complete when slider reaches 100
-    if (val === 100 && !isComplete) {
-      setTimeout(() => {
-        setCompletingFlash(true);
-        setTimeout(() => { onMarkComplete?.(); setCompletingFlash(false); }, 700);
-      }, 300);
-    }
   };
 
   // Dynamic glow background follows cursor
@@ -268,11 +224,10 @@ const TaskCard: React.FC<TaskCardProps> = ({
         )}
 
         <div className="px-5 pt-4 pb-3 ml-[3px]">
-          {/* Drag handle — always visible, serves as the drag initiator */}
-          {dragControls && !isComplete && (
+          {/* Drag handle — visual affordance for dragging the card */}
+          {!isComplete && (
             <div
               data-tour="drag-handle"
-              onPointerDown={(e) => { e.stopPropagation(); dragControls.start(e); }}
               className="absolute top-2 left-4 z-10 flex items-center justify-center w-6 h-5 rounded cursor-grab active:cursor-grabbing"
               style={{ color: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.18)', touchAction: 'none' }}
               title="Drag to reorder"
@@ -393,7 +348,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
               </div>
             </div>
 
-            {/* Pace readout — drift + velocity */}
+            {/* Pace readout — drift + projected finish */}
             <div className="flex flex-col items-end gap-1 shrink-0">
               <div className="flex items-center gap-1.5">
                 {syncing && (
@@ -406,7 +361,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
                 )}
                 <InfoTooltip
                   size={10}
-                  explanation="Whether your actual completion % is ahead of or behind where it should be at this point in the task's timeline."
+                  explanation="Drift: how far ahead or behind you are vs expected progress at this point in time. Positive is ahead."
                 />
                 <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>
                   {isComplete ? 'done' : pace.drift >= 0 ? 'ahead' : 'behind'}
@@ -414,12 +369,23 @@ const TaskCard: React.FC<TaskCardProps> = ({
               </div>
               {!isComplete && (
                 <>
-                  <span className="font-mono font-bold text-base leading-none" style={{ color: driftColor }}>
+                  <motion.span
+                    key={pace.drift}
+                    initial={{ opacity: 0.4, y: -2 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="font-mono font-bold text-base leading-none"
+                    style={{ color: driftColor }}>
                     {pace.drift > 0 ? '+' : ''}{pace.drift}%
-                  </span>
-                  <span className="text-[9px] font-mono" style={{ color: 'var(--text-faint)' }}>
-                    {pace.velocityRate}%/d · need {pace.requiredRate}%/d
-                  </span>
+                  </motion.span>
+                  {/* Show consistency instead of raw velocity — more actionable signal */}
+                  <div className="flex items-center gap-1">
+                    <span className="w-1 h-1 rounded-full" style={{
+                      background: pace.consistency >= 70 ? '#22c55e' : pace.consistency >= 45 ? '#f59e0b' : '#ef4444',
+                    }} />
+                    <span className="text-[9px] font-mono" style={{ color: 'var(--text-faint)' }}>
+                      {pace.consistency}% steady
+                    </span>
+                  </div>
                 </>
               )}
             </div>
@@ -427,7 +393,34 @@ const TaskCard: React.FC<TaskCardProps> = ({
 
           {/* Pace chart — expected vs actual over time */}
           {!isComplete && (
-            <div className="mt-3">
+            <div className="mt-3 rounded-xl overflow-hidden"
+              style={{
+                background: isDark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.025)',
+                border: `1px solid rgba(${cfg.glowRgb},0.14)`,
+                padding: '6px 8px 4px',
+              }}>
+              {/* Mini metric row above chart */}
+              <div className="flex items-center justify-between mb-1 px-0.5">
+                <span className="text-[9px] font-mono uppercase tracking-widest"
+                  style={{ color: 'var(--text-faint)' }}>pace</span>
+                <div className="flex items-center gap-2">
+                  {/* Finish probability */}
+                  {pace.finishProbability !== undefined && (
+                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full"
+                      style={{
+                        background: `${pace.finishProbability >= 70 ? '#22c55e' : pace.finishProbability >= 45 ? '#f59e0b' : '#ef4444'}14`,
+                        color: pace.finishProbability >= 70 ? '#4ade80' : pace.finishProbability >= 45 ? '#fbbf24' : '#f87171',
+                      }}>
+                      {pace.finishProbability}% on-time
+                    </span>
+                  )}
+                  {/* Velocity vs required */}
+                  <span className="text-[9px] font-mono"
+                    style={{ color: pace.velocityRate >= pace.requiredRate * 0.8 ? '#4ade80' : '#f87171' }}>
+                    {pace.velocityRate}%/d
+                  </span>
+                </div>
+              </div>
               <PaceChart task={{ ...task, completionPercent: localProgress }} isDark={isDark} compact metrics={pace} />
               {/* Deadline Physics curve (Phase 2) */}
               <DeadlinePhysics
@@ -441,105 +434,31 @@ const TaskCard: React.FC<TaskCardProps> = ({
             </div>
           )}
 
-          {/* Progress section — subtask-driven OR manual slider */}
+          {/* Progress section */}
           {!isComplete && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-              className="mt-3 pt-3 overflow-hidden" style={{ borderTop: `1px solid ${dividerColor}` }}>
-
-              {hasSubtasks ? (
-                /* ── Subtask-driven — locked bar + next subtask chip ── */
-                <div>
-                  {/* Header row */}
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] font-mono" style={{ color: 'var(--text-faint)' }}>Progress</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full"
-                        style={{ background: `rgba(${cfg.glowRgb},0.1)`, color: cfg.accent, border: `1px solid rgba(${cfg.glowRgb},0.18)` }}>
-                        {task.subtasks!.filter(s => s.completed).length}/{task.subtasks!.length} subtasks
-                      </span>
-                    </div>
-                    <motion.span key={localProgress} initial={{ opacity: 0.5, x: 4 }} animate={{ opacity: 1, x: 0 }}
-                      className="font-mono text-[11px] font-semibold" style={{ color: cfg.accent }}>
-                      {localProgress}%
-                    </motion.span>
-                  </div>
-
-                  {/* Locked progress bar */}
-                  <div className="h-1.5 rounded-full overflow-hidden mb-2.5"
-                    style={{ background: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }}>
-                    <motion.div className="h-full rounded-full"
-                      animate={{ width: `${localProgress}%` }}
-                      transition={{ type: 'spring', stiffness: 120, damping: 20 }}
-                      style={{ background: `linear-gradient(90deg,${cfg.accent}88,${cfg.accent})`,
-                        boxShadow: `0 0 6px ${cfg.accent}60` }} />
-                  </div>
-
-                  {/* Next incomplete subtask */}
-                  {nextSubtask ? (
-                    <motion.div
-                      initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer"
-                      style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
-                        border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}` }}
-                      onClick={e => { e.stopPropagation(); onOpenDetail?.(task); }}
-                      title="Open task to tick subtasks"
-                    >
-                      {/* Empty checkbox */}
-                      <div className="w-3.5 h-3.5 rounded-full shrink-0 flex items-center justify-center"
-                        style={{ border: `1.5px solid rgba(${cfg.glowRgb},0.4)`, background: 'transparent' }} />
-                      <span className="flex-1 text-[11px] font-mono truncate" style={{ color: 'var(--text-secondary)' }}>
-                        {nextSubtask.title}
-                      </span>
-                      {nextSubtask.estimatedMinutes > 0 && (
-                        <span className="text-[9px] font-mono shrink-0" style={{ color: 'var(--text-faint)' }}>
-                          ~{nextSubtask.estimatedMinutes}m
-                        </span>
-                      )}
-                    </motion.div>
-                  ) : (
-                    /* All subtasks done */
-                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
-                      style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.18)' }}>
-                      <span className="text-[10px] font-mono" style={{ color: '#4ade80' }}>
-                        ✓ All subtasks complete — mark task done
-                      </span>
-                    </div>
+            <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${dividerColor}` }}>
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-mono" style={{ color: 'var(--text-faint)' }}>Progress</span>
+                  {hasSubtasks && (
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full"
+                      style={{ background: `rgba(${cfg.glowRgb},0.1)`, color: cfg.accent, border: `1px solid rgba(${cfg.glowRgb},0.18)` }}>
+                      {task.subtasks!.filter(s => s.completed).length}/{task.subtasks!.length} subtasks
+                    </span>
                   )}
                 </div>
-              ) : (
-                /* ── Manual slider — no subtasks ── */
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[11px] font-mono" style={{ color: 'var(--text-faint)' }}>Progress Log</span>
-                    <motion.span key={`${localProgress}-${pace.requiredHoursPerDay}`}
-                      initial={{ opacity: 0.5, x: 4 }} animate={{ opacity: 1, x: 0 }}
-                      className="font-mono text-[11px] font-semibold" style={{ color: cfg.accent }}>
-                      {localProgress}% — {fmtHours(pace.requiredHoursPerDay)}/day to finish
-                    </motion.span>
-                  </div>
-                  <TrustDecayBar
-                    selfReported={localProgress}
-                    expectedProgress={pace.expected}
-                    lastCheckInAt={
-                      task.sparkline && task.sparkline.length > 0
-                        ? [...task.sparkline].filter(p => p.timestamp).sort((a, b) =>
-                            new Date(b.timestamp!).getTime() - new Date(a.timestamp!).getTime()
-                          )[0]?.timestamp || null
-                        : null
-                    }
-                    trustDecay={Math.min(40, Math.max(0, localProgress - pace.expected))}
-                    status={task.status}
-                    isDark={isDark}
-                  />
-                  <div className="relative mt-1">
-                    <input type="range" min={0} max={100} value={localProgress} onChange={handleSlider}
-                      onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}
-                      className="w-full velocity-slider"
-                      style={{ '--slider-accent': cfg.accent } as React.CSSProperties} />
-                  </div>
-                </div>
-              )}
-            </motion.div>
+                <span className="font-mono text-[11px] font-semibold" style={{ color: cfg.accent }}>
+                  {localProgress}%
+                </span>
+              </div>
+              <div className="h-1 rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }}>
+                <div style={{
+                  height: '100%', width: `${localProgress}%`, borderRadius: 9999,
+                  background: `linear-gradient(90deg,${cfg.accent}88,${cfg.accent})`,
+                  boxShadow: `0 0 6px ${cfg.accent}50`,
+                }} />
+              </div>
+            </div>
           )}
 
           {/* Negotiate */}
@@ -610,11 +529,14 @@ const TaskCard: React.FC<TaskCardProps> = ({
 
         {/* Bottom progress bar */}
         <div className="absolute bottom-0 left-[3px] right-0 h-[2px]" style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)' }}>
-          <motion.div className="h-full"
-            initial={{ width: 0 }}
-            animate={{ width: `${isComplete ? 100 : localProgress}%` }}
-            transition={{ type: 'spring', stiffness: 100, damping: 20, delay: 0.4 }}
-            style={{ background: `linear-gradient(90deg,${cfg.accent}88,${cfg.accent})`, boxShadow: `0 0 8px ${cfg.progressGlow}` }} />
+          <div
+            ref={bottomBarRef}
+            className="h-full"
+            style={{
+              width: `${isComplete ? 100 : localProgress}%`,
+              background: `linear-gradient(90deg,${cfg.accent}88,${cfg.accent})`,
+              boxShadow: `0 0 8px ${cfg.progressGlow}`,
+            }} />
         </div>
       </motion.div>
 

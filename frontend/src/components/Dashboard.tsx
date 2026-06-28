@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence, Reorder, useInView, useDragControls } from 'framer-motion';
+import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   Zap, FastForward, CheckCircle, ChevronRight,
@@ -75,7 +75,7 @@ const Counter: React.FC<{ to: number | string; duration?: number }> = ({ to, dur
 
 // ── Section divider ────────────────────────────────────────────────────────────
 const SectionDivider: React.FC<{ label: string; count?: number; dimmed?: boolean; accent?: string; isDark: boolean }> = ({ label, count, dimmed, accent, isDark }) => {
-  const labelColor = dimmed ? (isDark ? '#52525b' : '#94a3b8') : (accent ?? (isDark ? '#94a3b8' : '#64748b'));
+  const labelColor = dimmed ? (isDark ? '#71717a' : '#94a3b8') : (accent ?? (isDark ? '#a1adb8' : '#64748b'));
   const lineColor = dimmed ? (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)') : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)');
   return (
     <div className="flex items-center gap-3">
@@ -109,6 +109,7 @@ const StatChip: React.FC<{ value: string; label: string; color: string; pulse?: 
 
 // ── DraggableTaskCard — wraps Reorder.Item with per-card drag controls ────────
 // dragControls lets the user drag only by the GripVertical handle, not the whole card.
+// ── DraggableTaskCard — HTML5 drag-and-drop, works correctly with CSS Grid ────
 interface DraggableTaskCardProps {
   task: Task;
   idx: number;
@@ -120,32 +121,61 @@ interface DraggableTaskCardProps {
   onProgressUpdate: (pct: number) => void;
   onTaskUpdate: (updated: Task) => void;
   onOpenDetail: (task: Task) => void;
+  // DnD callbacks
+  onDragStart: (id: string) => void;
+  onDragEnter: (id: string) => void;
+  onDragEnd: () => void;
+  isDragOver: boolean;
+  isDragging: boolean;
 }
+
 const DraggableTaskCard: React.FC<DraggableTaskCardProps> = ({
-  task, idx, fastForwarded, isDark, onNegotiate, onHotStart, onMarkComplete, onProgressUpdate, onTaskUpdate, onOpenDetail,
+  task, idx, fastForwarded, isDark, onNegotiate, onHotStart, onMarkComplete,
+  onProgressUpdate, onTaskUpdate, onOpenDetail,
+  onDragStart, onDragEnter, onDragEnd, isDragOver, isDragging,
 }) => {
-  const controls = useDragControls();
   return (
-    <Reorder.Item key={task.id} value={task} as="div" dragListener={false} dragControls={controls}>
-      <motion.div
-        data-tour={idx === 0 ? 'tour-task-card' : undefined}
-        initial={{ opacity: 0, y: 20, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.92, y: -10 }}
-        transition={{ delay: idx * 0.06, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}>
-        <TaskCard
-          task={task}
-          isHot={task.status === 'RED' && fastForwarded}
-          isDark={isDark}
-          onNegotiate={onNegotiate}
-          onHotStart={onHotStart}
-          onMarkComplete={onMarkComplete}
-          onProgressUpdate={onProgressUpdate}
-          onTaskUpdate={onTaskUpdate}
-          onOpenDetail={onOpenDetail}
-          dragControls={controls}
-        />
-      </motion.div>
-    </Reorder.Item>
+    <motion.div
+      data-tour={idx === 0 ? 'tour-task-card' : undefined}
+      initial={{ opacity: 0, y: 20, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.92, y: -10 }}
+      transition={{ delay: idx * 0.06, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        // Transparent drag image so Framer's own element is used
+        const ghost = document.createElement('div');
+        ghost.style.position = 'fixed';
+        ghost.style.top = '-9999px';
+        document.body.appendChild(ghost);
+        e.dataTransfer.setDragImage(ghost, 0, 0);
+        setTimeout(() => document.body.removeChild(ghost), 0);
+        onDragStart(task.id);
+      }}
+      onDragEnter={(e) => { e.preventDefault(); onDragEnter(task.id); }}
+      onDragOver={(e) => e.preventDefault()}
+      onDragEnd={onDragEnd}
+      style={{
+        opacity: isDragging ? 0.35 : 1,
+        outline: isDragOver ? `2px solid rgba(34,197,94,0.6)` : 'none',
+        outlineOffset: '2px',
+        borderRadius: 12,
+        transition: 'opacity 0.15s ease, outline 0.1s ease',
+      }}
+    >
+      <TaskCard
+        task={task}
+        isHot={task.status === 'RED' && fastForwarded}
+        isDark={isDark}
+        onNegotiate={onNegotiate}
+        onHotStart={onHotStart}
+        onMarkComplete={onMarkComplete}
+        onProgressUpdate={onProgressUpdate}
+        onTaskUpdate={onTaskUpdate}
+        onOpenDetail={onOpenDetail}
+      />
+    </motion.div>
   );
 };
 
@@ -177,9 +207,49 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
   // Pending triage — shows a countdown toast before actually applying the reschedule
   const [pendingTriage, setPendingTriage] = useState<{ taskId: string; taskName: string } | null>(null);
   const prevStatusRef = useRef<Record<string, PaceStatus>>({});
-  // Detail modal — lifted to Dashboard level so Reorder re-renders never close it
+  // Detail modal — lifted to Dashboard level so re-renders never close it
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+
+  // ── Drag-and-drop state ────────────────────────────────────────────────────
+  const dragIdRef = useRef<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  const handleDragStart = useCallback((id: string) => {
+    dragIdRef.current = id;
+    setDraggingId(id);
+  }, []);
+
+  const handleDragEnter = useCallback((id: string) => {
+    if (dragIdRef.current && dragIdRef.current !== id) {
+      setDragOverId(id);
+    }
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    const fromId = dragIdRef.current;
+    const toId = dragOverId;
+    dragIdRef.current = null;
+    setDraggingId(null);
+    setDragOverId(null);
+
+    if (!fromId || !toId || fromId === toId) return;
+
+    setTasks(prev => {
+      const active = prev.filter(t => !t.isRescheduled && t.status !== 'COMPLETE' && t.status !== 'failed');
+      const rest = prev.filter(t => t.isRescheduled || t.status === 'COMPLETE' || t.status === 'failed');
+
+      const fromIdx = active.findIndex(t => t.id === fromId);
+      const toIdx = active.findIndex(t => t.id === toId);
+      if (fromIdx === -1 || toIdx === -1) return prev;
+
+      const reordered = [...active];
+      const [moved] = reordered.splice(fromIdx, 1);
+      reordered.splice(toIdx, 0, moved);
+      return [...reordered, ...rest];
+    });
+  }, [dragOverId]);
 
   // ── Tour target refs ───────────────────────────────────────────────────────
   const [tourDone, setTourDone] = useState(false);
@@ -302,7 +372,9 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
     list.map(t => {
       if (t.status === 'COMPLETE' || t.isRescheduled) return t;
       const m = computePaceMetrics(t);
-      return { ...t, currentPaceHoursPerDay: m.requiredHoursPerDay, status: m.status, paceMetrics: m };
+      // status is authoritative from the backend — don't overwrite it.
+      // Only update secondary telemetry (hours/day + attached metrics).
+      return { ...t, currentPaceHoursPerDay: m.requiredHoursPerDay, paceMetrics: m };
     }), []);
 
   // ── Quick task entry from dashboard bar ────────────────────────────────────
@@ -527,11 +599,6 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
     }
   }, [tasks]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleReorder = (newOrder: Task[]) => {
-    const rest = tasks.filter(t => t.isRescheduled || t.status === 'COMPLETE');
-    setTasks([...newOrder, ...rest]);
-  };
-
   const STATS = [
     { icon: LayoutGrid,  label: 'Active Tasks',   value: loading ? '—' : String(activeTasks.length),    color: 'var(--text-primary)' },
     { icon: Clock,       label: 'Avg/day',        value: loading ? '—' : avgHours,                     color: '#f59e0b' },
@@ -727,9 +794,10 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
             <p className="text-sm font-mono">No active tasks. Add one via the entry bar above.</p>
           </motion.div>
         ) : (
-          <Reorder.Group axis="y" values={activeTasks} onReorder={handleReorder} as="div"
+          <div
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4"
-            style={{ gridAutoRows: 'min-content' }}>
+            onDragOver={(e) => e.preventDefault()}
+          >
             <AnimatePresence>
               {activeTasks.map((task, idx) => (
                 <DraggableTaskCard
@@ -744,10 +812,15 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
                   onProgressUpdate={pct => setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completionPercent: pct } : t))}
                   onTaskUpdate={updated => setTasks(prev => prev.map(t => t.id === updated.id ? { ...t, ...updated } : t))}
                   onOpenDetail={task => setDetailTask(task)}
+                  onDragStart={handleDragStart}
+                  onDragEnter={handleDragEnter}
+                  onDragEnd={handleDragEnd}
+                  isDragOver={dragOverId === task.id}
+                  isDragging={draggingId === task.id}
                 />
               ))}
             </AnimatePresence>
-          </Reorder.Group>
+          </div>
         )}
 
         {/* Rescheduled */}

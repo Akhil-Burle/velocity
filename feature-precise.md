@@ -1,59 +1,83 @@
-# ⚡ Velocity — Feature Precise
+# Velocity — Features
 
-**Brain Dump Engine** — Paste any text and Gemini extracts structured tasks with deadlines, priorities, and cognitive weights instantly.
+**Tech Stack:** React 18 + TypeScript, Vite, Tailwind CSS, Framer Motion, Recharts, Lucide React — Node.js/Express, MongoDB Atlas + Mongoose, JWT + bcrypt, Google Gemini AI (Vertex AI / Developer API), Google Calendar API (OAuth2), Google Cloud TTS, GitHub API (@octokit/rest), Firebase Hosting frontend, Google Cloud Run backend
 
-**Chaos Scanner** — Drop a photo of a whiteboard or syllabus and Gemini Vision reads every task out of it.
+---
 
-**Omni-Bar (Ctrl+K)** — Describe your problem in plain English anywhere in the app and AI surfaces the right action.
+**Guest Login** — Issues a 24-hour JWT for a disposable session with no credentials required.
 
-**Burnout Horizon Chart** — 14-day chart showing required vs available hours; pulses red and offers one-click triage when you're over capacity.
+**Demo Login** — Username/password login against MongoDB with bcrypt-hashed credentials (demo / velocity2026).
 
-**Live Pace Tracking** — Task cards show real-time sparklines that update on every progress check-in and flag critical tasks with a LIVE badge.
+**Google Sign-In** — Full OAuth2 flow requesting calendar.readonly scope, creates or finds a user by Google ID.
 
-**Trust Score Check-ins** — Compares self-reported progress against actual subtask completion and recalibrates pace when they diverge.
+**Brain Dump (Text)** — Paste any free-form text and Gemini extracts up to 5 structured tasks with deadlines, subtasks, and cognitive weights.
 
-**Velocity Degradation Alerts** — Recalculates all task paces every 60 seconds and toasts you if anything crosses from green to amber or red.
+**Chaos Scanner (Image)** — Upload a whiteboard or syllabus photo and Gemini Vision reads up to 10 tasks out of it.
 
-**Panic Mode** — Generates a task-specific AI rescue checklist, runnable boilerplate, and optional GitHub repo for any task due within 24 hours.
+**Task Management** — Full CRUD for tasks with live pace metrics (GREEN/AMBER/RED), sparkline history, and auto-overdue detection.
 
-**Delay Email** — Detects your next calendar event, simulates a travel delay, and drafts a professional apology email via Gemini.
+**Subtask Management** — Add, complete, rename, or delete subtasks; task completion percent auto-derives from subtask ratio.
 
-**Inbox Triage** — Classifies unread Gmail by action type and turns each email into a one-click micro-task.
+**Pace Engine** — Core algorithm computing required pace, drift, consistency score, velocity rate, and on-time probability for every task.
 
-**Smart Task Routing** — Scores tasks against your free calendar windows and surfaces the single best task to work on right now.
+**Check-In (Trust Score)** — User self-reports progress; system compares against actual subtask completion and scores self-reporting accuracy (0–100).
 
-**Ultimatum Engine** — When two deadlines genuinely conflict, forces a conscious choice between them with AI-written cost sentences for each.
+**Hot-Start** — Gemini generates a starter scaffold (boilerplate/outline/diagram structure) for any task to eliminate activation friction.
 
-**Negotiate** — Drafts a deadline extension email tailored to the recipient type using your actual task progress as context.
+**Negotiate** — Drafts a professional deadline extension email tailored to the recipient type using actual task progress as context.
 
-**Drag-to-Reorder** — Active task cards can be dragged by their grip handle to re-prioritize the queue.
+**Triage** — Detects workload overload and automatically defers the safest task (lowest weight + furthest deadline).
 
-**Velocity Credits** — Every meaningful action (completing tasks, check-ins, using AI tools) earns VC that accumulate into a lifetime credit balance.
+**Reschedule / Slot Packer** — Packs all subtasks into available working hours and writes scheduled slot timestamps back to each subtask.
 
-**Level Progression** — Lifetime credits drive a 9-tier level system from Drifter to Apex Operator, visible everywhere in the app.
+**Calendar View** — Merges internal slot-packed events with live Google Calendar meetings into a single week-view calendar.
 
-**Credits Ticker** — Persistent header widget showing your live VC balance, level ring, title, and streak; animates a +VC burst on every earn.
+**Command Day** — Builds today's full timeline as focus blocks ordered by urgency, with meeting blocks and recovery buffers.
 
-**Achievements** — Ten unlockable badges earned from real activity (first task, 7-day streak, 1,000 VC, panic cleared, etc.).
+**AI Rebalance** — Re-orders daily focus blocks by cognitive weight and time-of-day energy fit with a Gemini-generated coaching note.
 
-**Global Leaderboard** — Anonymised cohort ranking that shows your percentile and rank among other Velocity users.
+**Panic Mode** — Generates an 8–15 step rescue checklist, runnable boilerplate, and optionally creates a GitHub repo with the scaffold committed.
 
-**Command Day** — A single-page proportional timeline of your entire day as focus blocks, recovery buffers, and a live NOW marker.
+**Ultimatum Engine** — Detects genuine two-task deadline conflicts and forces a conscious priority choice with AI-written failure cost sentences.
 
-**AI Rebalance** — Reorders your day's focus blocks by energy-time fit and explains the reasoning in one Gemini-generated sentence.
+**OmniBar** — Natural language command bar that classifies intent (8 types), respects Policy Memory, and auto-executes or suggests based on confidence.
 
-**Velocity DNA** — A 6-axis radar chart (Focus, Consistency, Recovery, Throughput, Calibration, Momentum) derived from your real telemetry.
+**Voice Input / TTS** — OmniBar accepts mic input via Web Speech API and speaks responses back via Google Cloud TTS (en-US-Journey-F).
 
-**Productivity Archetype** — Derived from your two strongest DNA axes and labeled (The Sprinter, The Surgeon, The Marathoner, etc.) with a one-line blurb.
+**Behavioral Drift Detection** — Infers real progress from subtask data, staleness, panic usage, and OmniBar language without asking the user.
 
-**Tomorrow Pre-Brief** — Nightly planning card showing task count, focus hours required, recommended start time, and a Gemini coaching paragraph for tomorrow.
+**Forecast Agent** — Computes finish probability, risk level, and a specific recovery action for every task, with autonomous drift alerts.
 
-**Estimation Calibration** — Per-task-type breakdown of estimated vs actual hours with a colour-coded accuracy rating and a specific adjustment recommendation.
+**Velocity Vector** — Aggregate productivity direction score (magnitude, direction, alignment) with worst-offender task list.
 
-**Morning Briefing** — On-demand Gemini summary of your current velocity state and top priorities for the day.
+**Reminders** — Auto-generates up to 10 time-sensitive reminders from task deadlines, stale check-ins, and habit schedules.
 
-**Theme Ripple** — Toggling dark/light mode plays an ink-drop ripple animation expanding from the toggle button across the full screen.
+**Goals** — Create high-level goals, link tasks to them, and track progress automatically from linked task completions.
 
-**Cinematic Demo Login** — Clicking "Enter Demo Sandbox" types the credentials on screen, calls the real API, and drops into the dashboard automatically.
+**Habits** — Daily/weekly habit tracking with streak calculation recomputed on every check-in.
 
-**Contextual Annotations** — Curved-arrow pointer hints appear once per session near key UI elements to guide new users to features they'd otherwise miss.
+**Settings** — Per-user work hours, briefing schedule, theme, accent color, and notification/sync toggles stored in MongoDB.
+
+**Morning Briefing** — On-demand Gemini summary calling out critical tasks, incomplete habits, and deliberate trade-offs.
+
+**Velocity DNA** — 6-axis radar chart (Focus, Consistency, Recovery, Throughput, Calibration, Momentum) with productivity archetype label.
+
+**Tomorrow Pre-Brief** — Evening planning card with required hours, recommended start time, and a Gemini coaching note for the next day.
+
+**Weekly Report** — 7-day credits, tasks completed, on-time rate, daily credit chart, hours logged, and streak.
+
+**Insights / Estimation Calibration** — AI productivity summary with planned vs. actual hour breakdown per task type and cognitive weight.
+
+**Gamification (Velocity Credits)** — Pace-differential credit awards for task completions with a 9-tier level system and achievement badges.
+
+**Leaderboard** — Deterministic anonymized cohort of 15 users showing rank, total users, and percentile for the current credit total.
+
+**Agent Activity Log** — Central log of every autonomous action with reasoning, outcome, autonomy level, and per-step undo support.
+
+**Policy Memory** — Tracks canceled autonomous actions; after 3 cancellations of the same type, the agent permanently switches to suggestion mode.
+
+**Cascade Chain** — When rebalance hits a hard conflict, the agent auto-sequences triage → negotiate → log as a single multi-step chain entry.
+
+**Auto-Seed** — On first login, seeds a demo account with 5 pace-realistic tasks complete with sparkline histories.
+
+**Health Endpoint** — Reports MongoDB status, active AI backend (Vertex vs. Developer API), model name, and server version.

@@ -7,3 +7,10 @@ gcloud run deploy velocity-backend --source="./backend" --platform="managed" --r
 
 run seed:
 node backend/scripts/seed-rich.js
+
+https://velocity-backend-477604227517.us-central1.run.app
+https://velocity-500511.web.app
+
+velocity-500511
+
+gcloud run deploy velocity-backend --source="./backend" --platform="managed" --region="us-central1" --allow-unauthenticated

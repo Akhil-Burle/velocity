@@ -7,6 +7,7 @@ const { db } = require('../utils/dataModel');
 const TaskModel = require('../models/Task');
 const HabitModel = require('../models/Habit');
 const { isConnected } = require('../db/connection');
+const { generate } = require('../services/geminiService');
 
 async function generateBriefing(req, res) {
   const userId = req.userId;
@@ -32,12 +33,8 @@ async function generateBriefing(req, res) {
 
   if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here') {
     try {
-      const { GoogleGenerativeAI } = require('@google/generative-ai');
-      const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = gemini.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
       const prompt = `Write a motivating 2-3 sentence morning productivity briefing for a student/developer.\n\nContext:\n- Active tasks: ${activeTasks.length}\n- Critical tasks needing attention: ${criticalTasks.map(t => `"${t.taskName}"`).join(', ') || 'none'}\n- Habits not yet completed today: ${todayHabits.map(h => h.title).join(', ') || 'all done'}\n- Recently failed tasks (deliberate choice): ${failedTasks.length > 0 ? failedTasks.map(t => `"${t.taskName}"`).join(', ') : 'none'}\n- Day: ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}\n\nBe specific, actionable, and honest. If there are recently failed tasks, acknowledge the tradeoff was made — don't pretend everything is fine. Keep it under 65 words. Return ONLY the briefing text.`;
-      const result = await model.generateContent(prompt);
-      briefing = result.response.text().trim();
+      briefing = await generate(prompt);
     } catch (e) {
       console.warn('[Briefing] Gemini failed, using fallback:', e.message);
     }

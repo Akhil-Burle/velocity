@@ -63,6 +63,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 export async function guestLogin(): Promise<{ token: string; userId: string; mode: 'guest' }> {
   return request<{ token: string; userId: string; mode: 'guest' }>('/auth/guest', {
     method: 'POST',
+    body: JSON.stringify({}),
   });
 }
 
@@ -123,7 +124,7 @@ export async function updateTask(id: string, updates: Partial<Task>): Promise<Ta
 
 /** POST /api/tasks/:id/complete — mark complete, returns pace-differential credit award. */
 export async function completeTask(id: string): Promise<{ task: Task; creditAward: CompletionAward }> {
-  return request(`/tasks/${id}/complete`, { method: 'POST' });
+  return request(`/tasks/${id}/complete`, { method: 'POST', body: JSON.stringify({}) });
 }
 
 /** PATCH /api/tasks/:id/subtasks/:subtaskId — toggle completed, or update title/mins. Returns updated subtask + full updated task. */
@@ -196,7 +197,7 @@ export async function runTriage(): Promise<{
   reason: string;
   triagedTask: Task | null;
 }> {
-  return request('/triage', { method: 'POST' });
+  return request('/triage', { method: 'POST', body: JSON.stringify({}) });
 }/** POST /api/negotiate — Draft an extension request message for a task. */
 export async function getNegotiateDraft(taskId: string): Promise<{ message: string; warning?: string }> {
   return request('/negotiate', {
@@ -264,13 +265,13 @@ export async function runReschedule(): Promise<{
   events: CalendarEvent[];
   message: string;
 }> {
-  return request('/reschedule', { method: 'POST' });
+  return request('/reschedule', { method: 'POST', body: JSON.stringify({}) });
 }
 
 // ─── Insights ─────────────────────────────────────────────────────────────────
 
 export async function generateInsights(): Promise<InsightsReport> {
-  return request<InsightsReport>('/insights/generate', { method: 'POST' });
+  return request<InsightsReport>('/insights/generate', { method: 'POST', body: JSON.stringify({}) });
 }
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
@@ -289,7 +290,7 @@ export async function updateSettings(updates: Partial<Settings>): Promise<Settin
 // ─── Briefing & Reminders ─────────────────────────────────────────────────────
 
 export async function generateBriefing(): Promise<{ briefing: string; generatedAt: string }> {
-  return request('/briefing/generate', { method: 'POST' });
+  return request('/briefing/generate', { method: 'POST', body: JSON.stringify({}) });
 }
 
 export async function fetchActiveReminders(): Promise<Reminder[]> {
@@ -301,7 +302,7 @@ export async function evaluateUltimatum(): Promise<
   | { triggered: false }
   | { triggered: true; taskA: Task; taskB: Task }
 > {
-  return request('/ultimatum/evaluate', { method: 'POST' });
+  return request('/ultimatum/evaluate', { method: 'POST', body: JSON.stringify({}) });
 }
 
 /** POST /api/ultimatum/resolve — mark loser as failed, log the decision. */
@@ -442,7 +443,7 @@ export async function fetchDayPlan(): Promise<DayPlan> {
 
 /** POST /api/dayplan/rebalance — energy-aware re-ordering of the day. */
 export async function rebalanceDayPlan(): Promise<DayPlan> {
-  return request<DayPlan>('/dayplan/rebalance', { method: 'POST' });
+  return request<DayPlan>('/dayplan/rebalance', { method: 'POST', body: JSON.stringify({}) });
 }
 
 // ─── Velocity DNA + Tomorrow Pre-Brief ───────────────────────────────────────
@@ -478,7 +479,7 @@ export async function createAgentLogEntry(entry: Omit<AgentLogEntry, 'id' | 'cre
 
 /** POST /api/agent-log/:id/undo — mark an entry undone. */
 export async function undoAgentLogEntry(id: string): Promise<{ success: boolean; entry: AgentLogEntry }> {
-  return request(`/agent-log/${id}/undo`, { method: 'POST' });
+  return request(`/agent-log/${id}/undo`, { method: 'POST', body: JSON.stringify({}) });
 }
 
 /** POST /api/agent-log/:id/undo-step — undo a single step in a chain entry. */
@@ -561,7 +562,7 @@ export interface ForecastResult {
 
 /** POST /api/agent/forecast — run the proactive pace forecast agent. */
 export async function runForecast(): Promise<ForecastResult> {
-  return request<ForecastResult>('/agent/forecast', { method: 'POST' });
+  return request<ForecastResult>('/agent/forecast', { method: 'POST', body: JSON.stringify({}) });
 }
 
 // ─── Behavioral Drift Score — Phase 1 ────────────────────────────────────────
@@ -615,7 +616,7 @@ export async function computeDriftScore(taskId: string): Promise<DriftScore> {
 
 /** POST /api/agent/drift-score-batch — compute drift for all active tasks + velocity vector */
 export async function computeDriftScoreBatch(): Promise<DriftBatchResult> {
-  return request<DriftBatchResult>('/agent/drift-score-batch', { method: 'POST' });
+  return request<DriftBatchResult>('/agent/drift-score-batch', { method: 'POST', body: JSON.stringify({}) });
 }
 
 /** POST /api/agent/drift-signal — extract progress sentiment delta from an utterance */

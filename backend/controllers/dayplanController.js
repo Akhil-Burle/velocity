@@ -17,7 +17,7 @@ const TaskModel = require('../models/Task');
 const SettingsModel = require('../models/Settings');
 const { isConnected } = require('../db/connection');
 const { appendAgentLog, checkPolicyStatus } = require('./agentLogController');
-const { generateNegotiateMessage } = require('../services/geminiService');
+const { generateNegotiateMessage, generate } = require('../services/geminiService');
 const { getBlockedSlotsForDate, isCalendarConfigured } = require('../services/googleCalendarService');
 
 const STATUS_RANK = { RED: 0, AMBER: 1, GREEN: 2, COMPLETE: 3, failed: 4 };
@@ -274,13 +274,9 @@ async function rebalanceDayPlan(req, res) {
     let note = '';
     if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here' && tasks.length > 0) {
       try {
-        const { GoogleGenerativeAI } = require('@google/generative-ai');
-        const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = gemini.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
         const list = ordered.slice(0, 6).map(t => `${t.taskName} (${t.cognitiveWeight}, ${t.status})`).join('; ');
         const prompt = `You are a focus coach. In ONE punchy sentence (max 22 words), explain why front-loading deep-focus work in the morning helps for this day. Tasks: ${list}. No preamble, just the sentence.`;
-        const result = await model.generateContent(prompt);
-        note = result.response.text().trim().replace(/^["']|["']$/g, '');
+        note = (await generate(prompt)).replace(/^["']|["']$/g, '');
       } catch (e) {
         console.warn('[DayPlan] Gemini note failed:', e.message);
       }

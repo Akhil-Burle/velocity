@@ -1,0 +1,288 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Theme tokens ─────────────────────────────────────────────────────────── */
+
+:root,
+[data-theme="dark"] {
+  /* Background — slightly lighter than #080a0e to reduce eye strain on dim screens */
+  --bg-base:        #0d1117;
+  --bg-surface:     rgba(255,255,255,0.055);
+  --bg-surface-md:  rgba(255,255,255,0.08);
+  --bg-surface-hi:  rgba(255,255,255,0.12);
+  --bg-header:      rgba(13,17,23,0.95);
+  --bg-card:        #141b23;
+
+  --border-subtle:  rgba(255,255,255,0.1);
+  --border-medium:  rgba(255,255,255,0.14);
+  --border-strong:  rgba(255,255,255,0.2);
+
+  /*
+   * TEXT HIERARCHY — maximised for low-brightness display readability
+   * Every level is at least 2 steps brighter than before.
+   * primary   → pure white         (21:1)
+   * secondary → bright near-white  (15:1)
+   * tertiary  → clear light slate  (10:1)
+   * muted     → readable slate     ( 7:1)
+   * faint     → still legible      ( 5:1) — minimum for ANY visible text
+   */
+  --text-primary:   #ffffff;   /* pure white — maximum contrast */
+  --text-secondary: #f1f5f9;   /* slate-100 */
+  --text-tertiary:  #e2e8f0;   /* slate-200 */
+  --text-muted:     #b0bec8;   /* custom — between slate-300/400 */
+  --text-faint:     #8899aa;   /* custom — readable on all dark surfaces */
+  --text-code:      #93c5fd;   /* blue-300 — brighter than sky-300 */
+
+  --input-bg:       rgba(255,255,255,0.07);
+  --input-border:   rgba(255,255,255,0.14);
+  --input-placeholder: #8899aa;
+
+  --scrollbar-thumb: rgba(255,255,255,0.15);
+  --scrollbar-hover: rgba(255,255,255,0.28);
+}
+
+[data-theme="light"] {
+  --bg-base:        #f1f5f9;
+  --bg-surface:     rgba(255,255,255,0.8);
+  --bg-surface-md:  rgba(255,255,255,0.9);
+  --bg-surface-hi:  rgba(0,0,0,0.05);
+  --bg-header:      rgba(248,250,252,0.94);
+  --bg-card:        #ffffff;
+
+  --border-subtle:  rgba(0,0,0,0.07);
+  --border-medium:  rgba(0,0,0,0.1);
+  --border-strong:  rgba(0,0,0,0.15);
+
+  --text-primary:   #0f172a;   /* slate-900 */
+  --text-secondary: #1e293b;   /* slate-800 */
+  --text-tertiary:  #334155;   /* slate-700 */
+  --text-muted:     #475569;   /* slate-600 */
+  --text-faint:     #64748b;   /* slate-500 */
+  --text-code:      #0369a1;
+
+  --input-bg:       rgba(0,0,0,0.04);
+  --input-border:   rgba(0,0,0,0.1);
+  --input-placeholder: #94a3b8;
+
+  --scrollbar-thumb: rgba(0,0,0,0.12);
+  --scrollbar-hover: rgba(0,0,0,0.22);
+}
+
+/* ─── Global base ──────────────────────────────────────────────────────────── */
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  box-sizing: border-box;
+}
+
+/*
+ * No universal transition — the ripple wipe is fast enough that individual
+ * element colour transitions just add visual noise.
+ */
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-size: 14px;   /* back to 14px base — size bumps happen via the tier overrides below */
+  line-height: 1.65;
+  text-rendering: optimizeLegibility;
+  font-weight: 400;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+/*
+ * FONT SIZE SCALE LIFT — dark mode only
+ * Bumped up by 1px per tier (was 2px — dialled back slightly).
+ *
+ *   text-[9px]  → 10px  (was 9px)
+ *   text-[10px] → 11px  (was 10px)
+ *   text-[11px] → 12px  (was 11px)
+ *   text-xs     → 12px  (was 12px / 0.75rem — unchanged, already right)
+ */
+[data-theme="dark"] .text-\[9px\]  { font-size: 10px !important; }
+[data-theme="dark"] .text-\[10px\] { font-size: 11px !important; }
+[data-theme="dark"] .text-\[11px\] { font-size: 12px !important; }
+[data-theme="dark"] .text-xs       { font-size: 12px !important; }
+
+/*
+ * FONT WEIGHT LIFT — dark mode only
+ * Thin font weights (400) at small sizes on dark backgrounds are extremely
+ * hard to read at low brightness. Bump all small text to medium weight.
+ */
+[data-theme="dark"] .text-\[9px\],
+[data-theme="dark"] .text-\[10px\],
+[data-theme="dark"] .text-\[11px\],
+[data-theme="dark"] .text-xs {
+  font-weight: 500;
+}
+
+/* Keep explicitly semibold/bold text at its declared weight */
+[data-theme="dark"] .font-semibold,
+[data-theme="dark"] .font-bold,
+[data-theme="dark"] .font-medium { font-weight: inherit; }
+
+/*
+ * MONO TEXT OVERRIDE — dark mode
+ * Monospace fonts render visually thinner than proportional fonts at the same
+ * weight. Subpixel antialiasing and a slight weight bump compensates.
+ */
+[data-theme="dark"] .font-mono {
+  -webkit-font-smoothing: subpixel-antialiased;
+  font-weight: 500;
+}
+
+/* Keep explicitly weighted mono text at its declared weight */
+[data-theme="dark"] .font-mono.font-bold,
+[data-theme="dark"] .font-mono.font-semibold,
+[data-theme="dark"] .font-mono.font-medium { font-weight: inherit; }
+
+/* Small letter-spacing lift for ALL tiny text in dark mode — helps at small sizes */
+[data-theme="dark"] .text-\[9px\],
+[data-theme="dark"] .text-\[10px\],
+[data-theme="dark"] .text-\[11px\] {
+  letter-spacing: 0.012em;
+}
+
+/* ─── Waveform animation ───────────────────────────────────────────────────── */
+
+@keyframes waveform {
+  from { height: 4px; }
+  to   { height: 20px; }
+}
+
+/* ─── Theme-switch ripple ──────────────────────────────────────────────────── */
+
+/*
+ * THEME WIPE — diagonal slash that sweeps top-right → bottom-left.
+ *
+ * The panel sits at 120vmax × 120vmax, rotated -15deg so its edge cuts
+ * diagonally. It starts translated fully off-screen to the right, then
+ * slides left to cover the viewport (theme flips underneath), then
+ * continues off to the left and exits — all in 500ms.
+ *
+ * --active triggers the slide. Two colour variants (dark / light) so the
+ * panel always matches the incoming theme colour.
+ */
+
+.theme-wipe {
+  position: fixed;
+  /* Centre the oversized rotated panel so both diagonal edges clear the viewport */
+  top:  50%;
+  left: 50%;
+  width:  160vmax;
+  height: 160vmax;
+  margin-top:  -80vmax;
+  margin-left: -80vmax;
+  z-index: 9999;
+  pointer-events: none;
+  will-change: transform;
+  /* Start: fully off-screen to the right */
+  transform: translateX(120%) rotate(-18deg);
+  transition: transform 0.5s cubic-bezier(0.76, 0, 0.24, 1);
+}
+
+.theme-wipe--dark  { background: #0d1117; }
+.theme-wipe--light { background: #f1f5f9; }
+
+/* Active: slide through centre — covers the full screen */
+.theme-wipe--active {
+  transform: translateX(0%) rotate(-18deg);
+}
+
+/* Exit: slide off to the left, slightly faster than entry */
+.theme-wipe--exit {
+  transform: translateX(-120%) rotate(-18deg);
+  transition: transform 0.38s cubic-bezier(0.76, 0, 0.24, 1);
+}
+
+/* ─── Scrollbar ────────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar       { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+
+/* ─── Selection ────────────────────────────────────────────────────────────── */
+
+::selection {
+  background: rgba(34,197,94,0.28);
+  color: var(--text-primary);
+}
+
+/* ─── Theme-aware Tailwind overrides (light mode) ───────────────────────────── */
+
+[data-theme="light"] .text-white    { color: var(--text-primary)   !important; }
+[data-theme="light"] .text-zinc-300 { color: var(--text-secondary) !important; }
+[data-theme="light"] .text-zinc-400 { color: var(--text-tertiary)  !important; }
+[data-theme="light"] .text-zinc-500 { color: var(--text-muted)     !important; }
+[data-theme="light"] .text-zinc-600 { color: var(--text-faint)     !important; }
+[data-theme="light"] .text-zinc-700 { color: var(--text-faint)     !important; }
+
+/* ─── Velocity slider ──────────────────────────────────────────────────────── */
+
+.velocity-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 3px;
+  border-radius: 9999px;
+  background: var(--bg-surface-hi);
+  outline: none;
+  cursor: pointer;
+}
+.velocity-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--slider-accent, #22c55e);
+  box-shadow: 0 0 8px var(--slider-accent, rgba(34,197,94,0.7));
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.velocity-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 14px var(--slider-accent, rgba(34,197,94,0.9));
+}
+.velocity-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: var(--slider-accent, #22c55e);
+  box-shadow: 0 0 8px var(--slider-accent, rgba(34,197,94,0.7));
+  cursor: pointer;
+}
+
+[data-theme="light"] .velocity-slider {
+  background: rgba(0,0,0,0.1);
+}
+
+/* ─── Shimmer skeleton ───────────────────────────────────────────────────── */
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+.shimmer-bg {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.07) 50%, transparent 100%);
+  background-size: 200% auto;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* ─── Perspective context ────────────────────────────────────────────────── */
+
+.perspective-card-container { perspective: 900px; }

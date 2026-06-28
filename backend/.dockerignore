@@ -1,0 +1,34 @@
+# ─── backend/.dockerignore ────────────────────────────────────────────────────
+# Excluded from Docker build context — keeps the image small and secrets out.
+
+# Dependencies (will be reinstalled via npm ci inside container)
+node_modules/
+
+# Secrets — NEVER bake .env into the image; use Cloud Run env vars / Secret Manager
+.env
+.env.*
+!.env.example
+
+# Git history
+.git/
+.gitignore
+
+# Dev/test scripts (not needed at runtime)
+scripts/
+test.js
+test_payload.json
+
+# Logs
+*.log
+logs/
+
+# OS/editor noise
+.DS_Store
+.vscode/
+.idea/
+*.suo
+*.sln
+*.sw?
+
+# Build artifacts (not applicable here but defensive)
+dist/

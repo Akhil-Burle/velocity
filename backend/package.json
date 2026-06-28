@@ -1,0 +1,31 @@
+{
+  "name": "velocity-backend",
+  "version": "1.0.0",
+  "description": "Velocity AI-powered productivity agent backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "@google-cloud/vertexai": "^1.9.0",
+    "@google/generative-ai": "^0.21.0",
+    "@octokit/rest": "^22.0.1",
+    "axios": "^1.18.1",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "googleapis": "^173.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "marked": "^18.0.5",
+    "mongoose": "^9.7.2",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

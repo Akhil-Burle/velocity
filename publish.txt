@@ -1,0 +1,5 @@
+frontend changes
+npm run build
+firebase deploy --only hosting
+backend changes:
+gcloud run deploy velocity-backend --source="./backend" --platform="managed" --region="us-central1" --allow-unauthenticated ...

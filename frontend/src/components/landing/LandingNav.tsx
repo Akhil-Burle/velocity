@@ -1,6 +1,7 @@
 /**
- * LandingNav.tsx — BEAST MODE
- * Glassmorphic nav with Velocity logo, section links, and CTA button.
+ * LandingNav.tsx
+ * Fixed glassmorphic nav (visible throughout the page), theme-aware, with a
+ * "Try Demo" button that fires the same cinematic login as the hero CTA.
  */
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,13 +14,18 @@ const NAV_LINKS = [
   { label: 'Tech Stack', href: '#google-tech' },
 ];
 
-const LandingNav: React.FC = () => {
+interface LandingNavProps {
+  onTryDemo: () => void;
+}
+
+const LandingNav: React.FC<LandingNavProps> = ({ onTryDemo }) => {
   const { theme, toggle } = useTheme();
-  const isDark = theme === 'dark';
+  const isDark = theme !== 'light';
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 40);
+    handler();
     window.addEventListener('scroll', handler, { passive: true });
     return () => window.removeEventListener('scroll', handler);
   }, []);
@@ -34,17 +40,19 @@ const LandingNav: React.FC = () => {
     document.querySelector(href)?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const textPrimary = isDark ? '#ffffff' : '#0f172a';
+  const linkColor = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(15,23,42,0.6)';
+
   return (
-    <header className="sticky top-0 z-[100]"
+    <header className="fixed top-0 inset-x-0 z-[120]"
       style={{
-        background: scrolled
-          ? (isDark ? 'rgba(8,11,16,0.92)' : 'rgba(248,250,252,0.92)')
-          : 'transparent',
+        background: scrolled ? (isDark ? 'rgba(8,11,16,0.82)' : 'rgba(238,242,248,0.85)') : 'transparent',
         backdropFilter: scrolled ? 'blur(24px)' : 'none',
-        borderBottom: scrolled ? '1px solid rgba(255,255,255,0.06)' : '1px solid transparent',
+        WebkitBackdropFilter: scrolled ? 'blur(24px)' : 'none',
+        borderBottom: scrolled ? `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.08)'}` : '1px solid transparent',
         transition: 'background 0.3s ease, backdrop-filter 0.3s ease, border-color 0.3s ease',
       }}>
-      <div className="max-w-6xl mx-auto flex items-center justify-between px-5 sm:px-8 py-4">
+      <div className="max-w-6xl mx-auto flex items-center justify-between px-5 sm:px-8 py-3.5">
         {/* Logo */}
         <motion.div className="flex items-center gap-2.5 cursor-pointer"
           whileHover={{ scale: 1.02 }} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
@@ -55,9 +63,7 @@ const LandingNav: React.FC = () => {
           >
             <Zap size={15} className="text-green-400" />
           </motion.div>
-          <div>
-            <span className="font-black text-base tracking-tight" style={{ color: '#fff', letterSpacing: '-0.02em' }}>Velocity</span>
-          </div>
+          <span className="font-black text-base tracking-tight" style={{ color: textPrimary, letterSpacing: '-0.02em' }}>Velocity</span>
         </motion.div>
 
         {/* Nav links — desktop only */}
@@ -65,9 +71,9 @@ const LandingNav: React.FC = () => {
           {NAV_LINKS.map(link => (
             <a key={link.label} href={link.href} onClick={scrollTo(link.href)}
               className="px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-150"
-              style={{ color: 'rgba(255,255,255,0.5)' }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.5)')}>
+              style={{ color: linkColor }}
+              onMouseEnter={e => (e.currentTarget.style.color = textPrimary)}
+              onMouseLeave={e => (e.currentTarget.style.color = linkColor)}>
               {link.label}
             </a>
           ))}
@@ -75,11 +81,10 @@ const LandingNav: React.FC = () => {
 
         {/* Right side actions */}
         <div className="flex items-center gap-3">
-          {/* Theme toggle */}
           <motion.button onClick={handleToggle} whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}
             aria-label="Toggle theme"
             className="w-8 h-8 flex items-center justify-center rounded-xl"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: isDark ? '#fde047' : '#475569' }}>
+            style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)', border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.1)'}`, color: isDark ? '#fde047' : '#475569' }}>
             <AnimatePresence mode="wait">
               {isDark
                 ? <motion.span key="sun" initial={{ rotate: -45, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 45, opacity: 0 }} transition={{ duration: 0.15 }} style={{ display: 'flex' }}><Sun size={14} /></motion.span>
@@ -88,9 +93,9 @@ const LandingNav: React.FC = () => {
             </AnimatePresence>
           </motion.button>
 
-          {/* CTA pill */}
+          {/* CTA pill — fires the cinematic demo login */}
           <motion.button
-            onClick={() => document.getElementById('cta')?.scrollIntoView({ behavior: 'smooth' })}
+            onClick={onTryDemo}
             whileHover={{ scale: 1.04, y: -1 }} whileTap={{ scale: 0.97 }}
             className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold"
             style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#000', boxShadow: '0 4px 16px rgba(34,197,94,0.25)' }}>

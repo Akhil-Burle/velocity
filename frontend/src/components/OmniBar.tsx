@@ -42,6 +42,8 @@ interface OmniBarProps {
   onActionComplete: (intent: string, taskId: string | null, result: Record<string, unknown>) => void;
   isDark?: boolean;
   tasks: Task[];
+  /** Optional text to pre-fill on open (e.g. carried over from the landing hero) */
+  initialValue?: string;
 }
 
 // Detect OS for keyboard shortcut display
@@ -99,7 +101,7 @@ type OmniPhase =
   | 'done'
   | 'error';
 
-const OmniBar: React.FC<OmniBarProps> = ({ isOpen, onClose, onActionComplete, isDark = true, tasks }) => {
+const OmniBar: React.FC<OmniBarProps> = ({ isOpen, onClose, onActionComplete, isDark = true, tasks, initialValue }) => {
   const [value, setValue]         = useState('');
   const [listening, setListening] = useState(false);
   const [phase, setPhase]         = useState<OmniPhase>('idle');
@@ -164,14 +166,15 @@ const OmniBar: React.FC<OmniBarProps> = ({ isOpen, onClose, onActionComplete, is
   // Auto-focus + reset on open
   useEffect(() => {
     if (isOpen) {
-      setValue('');
+      const seed = initialValue?.trim() || '';
+      setValue(seed);
       setClassified(null);
       setError(null);
       setDoneMessage(null);
-      setPhase('idle');
+      setPhase(seed ? 'typing' : 'idle');
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [isOpen]);
+  }, [isOpen, initialValue]);
 
   // Escape key
   useEffect(() => {
@@ -212,6 +215,18 @@ const OmniBar: React.FC<OmniBarProps> = ({ isOpen, onClose, onActionComplete, is
       setPhase('error');
     }
   }, [speak]);
+
+  // Auto-classify a seeded value carried over from the landing hero
+  const seededRef = useRef<string | null>(null);
+  useEffect(() => {
+    const seed = initialValue?.trim();
+    if (isOpen && seed && seededRef.current !== seed) {
+      seededRef.current = seed;
+      const t = setTimeout(() => runClassify(seed), 650);
+      return () => clearTimeout(t);
+    }
+    if (!isOpen) seededRef.current = null;
+  }, [isOpen, initialValue, runClassify]);
 
   const handleInput = (text: string) => {
     setValue(text);

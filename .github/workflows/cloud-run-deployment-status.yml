@@ -1,0 +1,36 @@
+name: Cloud Run Deployment Status
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+
+jobs:
+  report_deployment:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+
+    steps:
+      - name: Create GitHub Deployment
+        id: deployment
+        uses: chrnorm/deployment-action@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          environment: Backend (Cloud Run)
+          environment-url: https://velocity-backend-477604227517.us-central1.run.app/api/health
+
+      - name: Wait for Cloud Build
+        # Give Cloud Build ~3 minutes to finish
+        run: sleep 180
+
+      - name: Mark Deployment Success
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
+          state: success
+          environment-url: https://velocity-backend-477604227517.us-central1.run.app/api/health

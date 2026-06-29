@@ -81,3 +81,23 @@
 **Auto-Seed** — On first login, seeds a demo account with 5 pace-realistic tasks complete with sparkline histories.
 
 **Health Endpoint** — Reports MongoDB status, active AI backend (Vertex vs. Developer API), model name, and server version.
+
+**Manual Task Creation** — Full form modal for creating tasks without AI: task name, deadline, type (CODE/WRITING/DIAGRAM/OTHER), cognitive weight, ownership (self vs. owed-to-someone with recipient name), starting progress, energy level, estimated session duration, inline subtask builder, and notes.
+
+**Guided Tour** — Sequential spotlight-based product walkthrough that fires once per session on first login, with directional arrows, step counter, auto-advance after 12s, and viewport-edge clamping for proper tooltip positioning.
+
+**Contextual Hints** — Page-aware hint bubbles with animated pulse beacons that appear 2s after navigating to a page, pointing at specific UI elements with directional arrows. Shares seen-state with the StartHere card via TourContext.
+
+**Start Here Card** — Dashboard banner showing 8 prioritized feature highlights as a "table of contents for judges," with progress tracking (N/8 seen), deep-link navigation that triggers contextual hints on arrival, and dismiss/re-open toggle.
+
+**Deadline Physics** — Visual physics layer on task cards rendering a required-pace-acceleration sparkline curve. Flat when slack exists, steep near deadline. Pulsing endpoint dot with urgency-driven animation speed.
+
+**Countdown Toast** — Confirm-by-exception interaction component used across Negotiate, Triage, and OmniBar. AI acts after X-second countdown unless user cancels; shows progress bar, timer pill, and Cancel/Edit buttons.
+
+**Landing Page** — Cinematic scroll-driven marketing page with animated trajectory line, Hero section with live OmniBar demo, Problem block, Behavioral Velocity bento, Agentic Chain showcase, Feature Bento grid, Google Cloud section, and Final CTA with cinematic login transition.
+
+**Tech Stack Page** — Dedicated page documenting every real technology powering Velocity with live status badges pulled from the health endpoint, docs links, and categorized sections (Google Technologies, Infrastructure, Frontend).
+
+**Results / Impact View** — Aggregate metrics dashboard showing total autonomous saves, assisted actions, hours saved (computed from triage/rebalance/panic counts), on-time deliveries, drift alerts fired, and the 5 most recent agent actions.
+
+**Decision Log** — MongoDB model tracking Ultimatum Engine resolutions — which task was chosen, which was failed, the reasoning, and timestamp — for audit trail and future pattern detection.

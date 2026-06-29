@@ -196,8 +196,24 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
   const [panicState, setPanicState]     = useState<PanicState | null>(null);
   // OmniBar state
   const [omniBarOpen, setOmniBarOpen]   = useState(false);
+  const [omniInitialValue, setOmniInitialValue] = useState<string | undefined>(undefined);
   const [forecastHealth, setForecastHealth] = useState<number | null>(null);
   const [pendingDeadlineTasks, setPendingDeadlineTasks] = useState<Task[]>([]);
+
+  // Pick up a task description carried over from the landing hero task bar.
+  // Opens the OmniBar pre-filled so the visitor's first typed thought is
+  // classified and acted on the moment they land in the dashboard.
+  useEffect(() => {
+    let pending: string | null = null;
+    try { pending = sessionStorage.getItem('velocity_pending_omni'); } catch { /* ignore */ }
+    if (pending && pending.trim()) {
+      try { sessionStorage.removeItem('velocity_pending_omni'); } catch { /* ignore */ }
+      setOmniInitialValue(pending.trim());
+      const t = setTimeout(() => setOmniBarOpen(true), 1100);
+      return () => clearTimeout(t);
+    }
+  }, []);
+
   // Pending triage — shows a countdown toast before actually applying the reschedule
   const [pendingTriage, setPendingTriage] = useState<{ taskId: string; taskName: string } | null>(null);
   const prevStatusRef = useRef<Record<string, PaceStatus>>({});
@@ -868,7 +884,8 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
       {/* OmniBar — CMD+K command palette */}
       <OmniBar
         isOpen={omniBarOpen}
-        onClose={() => setOmniBarOpen(false)}
+        onClose={() => { setOmniBarOpen(false); setOmniInitialValue(undefined); }}
+        initialValue={omniInitialValue}
         onActionComplete={(intent, taskId, result) => {
           // Refresh tasks after any action that might have changed them
           const actionsNeedingRefresh = ['create_task', 'run_triage', 'panic_mode', 'negotiate', 'rebalance', 'smart_routing'];

@@ -13,7 +13,6 @@ import { calcRequiredHoursPerDay, derivePaceStatus, computePaceMetrics, fmtHours
 import { useTheme } from '../ThemeContext';
 import { useCredits } from '../CreditsContext';
 import TaskCard from './TaskCard';
-import HotStartPanel from './HotStartPanel';
 import NegotiateModal from './NegotiateModal';
 import TaskDetailModal from './TaskDetailModal';
 import CreateTaskModal from './CreateTaskModal';
@@ -28,7 +27,6 @@ import {
   fetchTasks,
   updateTask as apiUpdateTask,
   completeTask as apiCompleteTask,
-  getHotStart,
   runTriage,
   getNegotiateDraft,
   evaluateUltimatum,
@@ -36,12 +34,10 @@ import {
 } from '../api';
 import UltimatumModal from './UltimatumModal';
 import PanicModePanel from './PanicModePanel';
-import GuidedTour from './GuidedTour';
 import StartHereCard from './StartHereCard';
 import CountdownToast from './CountdownToast';
 import { useToast } from './Toast';
 import DeadlineConfirmModal from './DeadlineConfirmModal';
-import type { TourStep } from './GuidedTour';
 import InfoTooltip from './InfoTooltip';
 
 interface DashboardProps { brainDumpText?: string; }
@@ -189,8 +185,6 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
 
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [hotStartTask, setHotStartTask] = useState<Task | null>(null);
-  const [hotStartContent, setHotStartContent] = useState('');
   const [negotiateTarget, setNegotiateTarget] = useState<NegotiateTarget | null>(null);
   const [sentEmails, setSentEmails] = useState<Set<string>>(new Set());
   const [fastForwarded, setFastForwarded] = useState(false);
@@ -252,74 +246,13 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
   }, [dragOverId]);
 
   // ── Tour target refs ───────────────────────────────────────────────────────
-  const [tourDone, setTourDone] = useState(false);
+  // Tour state is now managed by TourContext (shared with StartHereCard + ContextualHints)
+  // No tourDone state needed — the old GuidedTour has been replaced.
 
-  // All tour steps use data-tour selector — no direct refs needed
-  const TOUR_STEPS: TourStep[] = [
-    {
-      target: 'tour-agent-log-link',
-      title: '① Agent Log — start here',
-      body: 'This is where Velocity proves it\'s truly agentic. Every autonomous AI action is logged here with timestamps and plain-English reasoning.',
-      placement: 'bottom',
-      color: '#22c55e',
-    },
-    {
-      target: 'tour-panic',
-      title: '② Panic Mode',
-      body: 'On RED tasks, "Activate Panic Mode" autonomously generates a rescue checklist + boilerplate and commits it to a real GitHub repo — no extra input.',
-      placement: 'top',
-      color: '#ef4444',
-    },
-    {
-      target: 'tour-braindump',
-      title: '③ Brain Dump',
-      body: 'Type anything here — "React lab due Friday, DBMS homework." AI parses deadlines, priority, and cognitive load instantly.',
-      placement: 'bottom',
-      color: '#22c55e',
-    },
-    {
-      target: 'tour-omni',
-      title: '④ AI Command Bar  ' + KBD_LABEL,
-      body: 'Press ' + KBD_LABEL + ' anywhere to talk to Velocity in plain English. "I\'m behind on everything" → AI picks the right action.',
-      placement: 'bottom',
-      color: '#22c55e',
-    },
-    {
-      target: 'tour-camera',
-      title: '⑤ Chaos Scanner',
-      body: 'Click "Scan" and drop a photo of your whiteboard, syllabus, or schedule. Gemini Vision extracts every task automatically.',
-      placement: 'bottom',
-      color: '#22c55e',
-    },
-    {
-      target: 'tour-burnout',
-      title: '⑥ Burnout Horizon',
-      body: '14-day workload forecast. Red = over capacity today. Click "Run Triage Now" to let AI decide what to defer.',
-      placement: 'top',
-      color: '#ef4444',
-    },
-    {
-      target: 'tour-triage',
-      title: '⑦ Triage + Ultimatum',
-      body: 'Click Triage when overloaded. If two tasks can\'t both finish, the Ultimatum modal forces a conscious choice about what fails.',
-      placement: 'bottom',
-      color: '#f59e0b',
-    },
-    {
-      target: 'tour-task-card',
-      title: '⑧ Task Cards + Drag',
-      body: 'Each card shows live pace, a sparkline, and ⠿ drag handle to reorder. Click a card for the full detail view + progress slider.',
-      placement: 'right',
-      color: '#22c55e',
-    },
-    {
-      target: 'tour-negotiate',
-      title: '⑨ Negotiate',
-      body: 'Tasks owed to someone show "Negotiate" — AI drafts a professional extension email. One-Tap Send delivers it immediately.',
-      placement: 'top',
-      color: '#f59e0b',
-    },
-  ];
+  // All tour steps use data-tour selector — still kept for reference but no longer
+  // used by GuidedTour (which is now ContextualHints). The data-tour attributes
+  // on the elements are used by ContextualHints directly.
+
   const surfaceBg     = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.85)';
   const surfaceBorder = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)';
 
@@ -407,14 +340,14 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
     setTimeout(() => {
       setTasks(prev => {
         const firstActive = prev.find(t => t.status === 'RED' && !t.isRescheduled);
-        if (firstActive) { setHotStartTask(firstActive); setHotStartContent(firstActive.hotStartContent || '// Hot-start scaffold loading...'); }
+        if (firstActive) handleOpenHotStart(firstActive);
         return prev;
       });
     }, 420);
   };
 
   const handleMarkComplete = async (taskId: string) => {
-    setHotStartTask(null); setHotStartContent('');
+    setPanicState(null);
     // Optimistic UI — mark complete and clear rescheduled flag so it moves to Completed section
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'COMPLETE' as PaceStatus, isRescheduled: false } : t));
     try {
@@ -429,41 +362,25 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
   };
 
   const handleOpenHotStart = async (task: Task) => {
-    const hoursUntil = (new Date(task.deadline).getTime() - Date.now()) / 3600000;
-    const isPanic = hoursUntil < 24; // FIXED: was < 2, now < 24
-
-    if (isPanic) {
-      // Zero-Hour: Panic Mode — show panel immediately with loading state
-      setPanicState({ task, checklist: [], boilerplate: '', loading: true });
-      try {
-        const result = await runPanicScaffold(task.id);
-        setPanicState({
-          task,
-          checklist:  result.checklist,
-          boilerplate: result.boilerplate,
-          repoUrl:    result.repoUrl,
-          loading:    false,
-        });
-        setTasks(prev => prev.map(t => t.id === task.id
-          ? { ...t, panicScaffold: { checklist: result.checklist, boilerplate: result.boilerplate, repoUrl: result.repoUrl } }
-          : t
-        ));
-        award('panic_resolved');
-      } catch (err: unknown) {
-        addToast({ type: 'error', message: `Panic Mode: ${err instanceof Error ? err.message : 'Scaffold failed'}` });
-        setPanicState(null);
-      }
-    } else {
-      // Legacy path: regular hot-start for non-critical tasks
-      setHotStartTask(task);
-      setHotStartContent(task.hotStartContent || '');
-      try {
-        const result = await getHotStart(task.id);
-        setHotStartContent(result.scaffold);
-        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, hotStartContent: result.scaffold } : t));
-      } catch (err: unknown) {
-        addToast({ type: 'error', message: `Hot-Start: ${err instanceof Error ? err.message : 'Hot-start failed'}` });
-      }
+    // Always use PanicModePanel — show immediately with loading state
+    setPanicState({ task, checklist: [], boilerplate: '', loading: true });
+    try {
+      const result = await runPanicScaffold(task.id);
+      setPanicState({
+        task,
+        checklist:   result.checklist,
+        boilerplate: result.boilerplate,
+        repoUrl:     result.repoUrl,
+        loading:     false,
+      });
+      setTasks(prev => prev.map(t => t.id === task.id
+        ? { ...t, panicScaffold: { checklist: result.checklist, boilerplate: result.boilerplate, repoUrl: result.repoUrl } }
+        : t
+      ));
+      award('panic_resolved');
+    } catch (err: unknown) {
+      addToast({ type: 'error', message: `Panic Mode: ${err instanceof Error ? err.message : 'Scaffold failed'}` });
+      setPanicState(null);
     }
   };
 
@@ -659,8 +576,7 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
       </div>
 
       {/* ── Main ────────────────────────────────────────────────────────────── */}
-      <main className="flex-1 relative z-10 px-4 sm:px-6 py-6 pb-28 transition-all duration-300"
-        style={{ marginRight: (hotStartTask || panicState) ? 480 : 0 }}>
+      <main className="flex-1 relative z-10 px-4 sm:px-6 py-6 pb-28">
 
         {/* Action buttons row */}
         <div className="flex items-center justify-between mb-6">
@@ -871,7 +787,6 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
 
       {/* Panels */}
       <AnimatePresence>
-        {/* Zero-Hour Panic Mode Panel (replaces HotStartPanel when deadline < 2h) */}
         {panicState && (
           <PanicModePanel
             key="panic"
@@ -884,11 +799,6 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
             onClose={() => setPanicState(null)}
             onMarkComplete={() => { handleMarkComplete(panicState.task.id); setPanicState(null); }}
           />
-        )}
-        {/* Legacy HotStartPanel for non-panic tasks */}
-        {hotStartTask && !panicState && (
-          <HotStartPanel key="hs" taskName={hotStartTask.taskName} code={hotStartContent || hotStartTask.hotStartContent}
-            isDark={isDark} onClose={() => { setHotStartTask(null); setHotStartContent(''); }} onMarkComplete={() => handleMarkComplete(hotStartTask.id)} />
         )}
       </AnimatePresence>
       <AnimatePresence>
@@ -978,10 +888,7 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
         tasks={activeTasks}
       />
 
-      {/* Guided tour — first-load only, non-blocking */}
-      {!tourDone && (
-        <GuidedTour steps={TOUR_STEPS} onDone={() => setTourDone(true)} startDelay={2000} />
-      )}
+      {/* Guided tour — replaced by ContextualHints in AppShell (non-blocking, page-aware) */}
 
       {/* Deadline confirmation modal — for tasks Gemini couldn't date */}
       <AnimatePresence>

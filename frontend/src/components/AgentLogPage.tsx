@@ -628,7 +628,7 @@ const AgentLogPage: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div data-tour="tour-agent-log-page-header" className="inline-flex items-center gap-2 mb-1">
             <Bot size={13} style={{ color: '#22c55e' }} />
             <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>
               Agent Activity Log
@@ -661,6 +661,7 @@ const AgentLogPage: React.FC = () => {
         style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)', border: `1px solid ${surfaceBorder}` }}>
         {tabs.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+            data-tour={tab.id === 'memory' ? 'tour-agent-memory-tab' : undefined}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all"
             style={{
               background: activeTab === tab.id ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.9)') : 'transparent',

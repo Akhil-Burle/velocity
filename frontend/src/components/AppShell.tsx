@@ -19,6 +19,8 @@ import { fetchActiveReminders, computeDriftScoreBatch, VelocityVector as Velocit
 import { Reminder } from '../types';
 import CreditsTicker from './CreditsTicker';
 import VelocityVectorIndicator from './VelocityVector';
+import ContextualHints from './ContextualHints';
+import TourReOpenButton from './TourReOpenButton';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -411,6 +413,9 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
               />
             )}
 
+            {/* Tour re-open button — shows when Start Here card is dismissed */}
+            <TourReOpenButton surfaceBorder={surfaceBorder} />
+
             {/* Velocity Credits ticker — persistent across all pages */}
             <CreditsTicker isDark={isDark} surfaceBorder={surfaceBorder} />
 
@@ -477,6 +482,9 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
           {children}
         </main>
       </div>
+
+      {/* Contextual hints — page-aware, non-blocking, shares state with StartHereCard */}
+      <ContextualHints />
     </div>
   );
 };

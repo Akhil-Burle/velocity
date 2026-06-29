@@ -184,6 +184,7 @@ const CommandDay: React.FC = () => {
           <motion.button
             onClick={handleRebalance}
             disabled={rebalancing || loading || !plan?.blocks.length}
+            data-tour="tour-command-day-rebalance"
             whileHover={!rebalancing ? { scale: 1.04, boxShadow: '0 0 18px rgba(34,197,94,0.3)' } : {}}
             whileTap={!rebalancing ? { scale: 0.96 } : {}}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold"
@@ -231,7 +232,7 @@ const CommandDay: React.FC = () => {
             exit={{ opacity: 0, height: 0 }}
             className="mb-4 overflow-hidden"
           >
-            <div className="flex items-start gap-3 px-4 py-3 rounded-xl"
+            <div data-tour="tour-command-day-auto" className="flex items-start gap-3 px-4 py-3 rounded-xl"
               style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
               <Bot size={13} style={{ color: '#f87171', marginTop: 1, flexShrink: 0 }} />
               <div className="flex-1 min-w-0">

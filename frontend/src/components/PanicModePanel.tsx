@@ -18,7 +18,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Zap, Copy, Check, CheckCircle, CheckCircle2, ChevronDown, ChevronUp,
-  Github, ExternalLink, AlertTriangle, Clock, Bot, Sparkles, GitCommit,
+  Github, ExternalLink, AlertTriangle, Bot, Sparkles, GitCommit,
   FileCode, ListChecks, Brain, ArrowRight,
 } from 'lucide-react';
 import { Task } from '../types';
@@ -276,66 +276,47 @@ const PanicModePanel: React.FC<PanicModePanelProps> = ({
   const boilerplateLines = boilerplate.split('\n');
 
   return (
-    <motion.div
-      initial={{ x: '100%', opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: '100%', opacity: 0 }}
-      transition={{ type: 'spring', stiffness: 280, damping: 30 }}
-      className="fixed top-0 right-0 h-full w-full max-w-[480px] z-40 flex flex-col"
-      style={{ background: panelBg, borderLeft: `1px solid ${panelBorder}`, boxShadow: `-20px 0 60px rgba(0,0,0,0.45), -4px 0 24px rgba(239,68,68,0.06)` }}
-    >
-      {/* Title bar */}
-      <div className="flex items-center justify-between px-4 py-3 shrink-0"
-        style={{ borderBottom: `1px solid ${divider}`, background: titleBarBg }}>
-        <div className="flex items-center gap-3">
-          <div className="flex gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-red-500/80" />
-            <div className="w-3 h-3 rounded-full bg-amber-500/80" />
-            <div className="w-3 h-3 rounded-full bg-green-500/80" />
-          </div>
-          <div className="flex items-center gap-2">
-            {isCritical && (
-              <motion.div animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 1.2, repeat: Infinity }}>
-                <AlertTriangle size={12} style={{ color: '#ef4444' }} />
-              </motion.div>
-            )}
-            <Zap size={12} style={{ color: isCritical ? '#ef4444' : '#22c55e' }} />
-            <span className="text-xs font-mono font-semibold tracking-wide"
-              style={{ color: isCritical ? '#f87171' : 'var(--text-secondary)' }}>
-              PANIC MODE
+    <>
+      {/* Dim backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        onClick={onClose}
+        className="fixed inset-x-0 bottom-0 z-[49]"
+        style={{ top: 57, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
+      />
+
+      {/* Panel */}
+      <motion.div
+        initial={{ x: '100%', opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        exit={{ x: '100%', opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 280, damping: 30 }}
+        className="fixed right-0 bottom-0 w-full max-w-[480px] z-50 flex flex-col"
+        style={{ top: 57, background: panelBg, borderLeft: `1px solid ${panelBorder}`, boxShadow: `-20px 0 60px rgba(0,0,0,0.55), -4px 0 24px rgba(239,68,68,0.08)` }}
+      >
+        {/* ── Task title bar ───────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between px-4 py-2.5 shrink-0"
+          style={{ borderBottom: `1px solid ${divider}`, background: titleBarBg }}>
+          <div className="flex gap-1.5 items-center mr-3 min-w-0">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-500/80 shrink-0" />
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80 shrink-0" />
+            <div className="w-2.5 h-2.5 rounded-full bg-green-500/80 shrink-0" />
+            <span className="text-[11px] font-mono ml-2 leading-snug" style={{ color: 'var(--text-secondary)' }}>
+              {task.taskName}
             </span>
-            {!loading && (
-              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded"
-                style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }}>
-                AUTONOMOUS
-              </span>
-            )}
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full"
-            style={{
-              background: isCritical ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
-              color: isCritical ? '#f87171' : '#fbbf24',
-              border: isCritical ? '1px solid rgba(239,68,68,0.22)' : '1px solid rgba(245,158,11,0.22)',
-            }}>
-            <Clock size={9} className="inline mr-1" />
-            {hoursUntil < 1 ? `${Math.round(hoursUntil * 60)}m` : fmtHours(hoursUntil)} left
-          </span>
           {!loading && (
             <motion.button onClick={handleCopy} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded shrink-0 text-xs font-mono"
               style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', color: 'var(--text-tertiary)' }}>
               {copied ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
               {copied ? 'Copied' : 'Copy'}
             </motion.button>
           )}
-          <motion.button onClick={onClose} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-            style={{ color: 'var(--text-faint)' }}>
-            <X size={15} />
-          </motion.button>
         </div>
-      </div>
 
       {/* Repo link if present */}
       <AnimatePresence>
@@ -452,23 +433,43 @@ const PanicModePanel: React.FC<PanicModePanelProps> = ({
         </AnimatePresence>
       </div>
 
-      {/* Mark Complete */}
+      {/* Mark Complete + Close */}
       <div className="shrink-0 px-4 py-4" style={{ borderTop: `1px solid ${divider}` }}>
         {!loading && (
-          <motion.button onClick={onMarkComplete}
-            whileHover={{ scale: 1.02, boxShadow: '0 0 24px rgba(34,197,94,0.25)' }}
-            whileTap={{ scale: 0.97 }}
-            className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl text-sm font-semibold text-black"
-            style={{ background: 'linear-gradient(135deg,#22c55e 0%,#16a34a 100%)' }}>
-            <CheckCircle size={15} />Mark Task Complete
-          </motion.button>
+          <div className="flex gap-2">
+            <motion.button onClick={onMarkComplete}
+              whileHover={{ scale: 1.02, boxShadow: '0 0 24px rgba(34,197,94,0.25)' }}
+              whileTap={{ scale: 0.97 }}
+              className="flex-1 flex items-center justify-center gap-2.5 py-3 rounded-xl text-sm font-semibold text-black"
+              style={{ background: 'linear-gradient(135deg,#22c55e 0%,#16a34a 100%)' }}>
+              <CheckCircle size={15} />Mark Task Complete
+            </motion.button>
+            <motion.button onClick={onClose}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl text-sm font-semibold"
+              style={{ background: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)', color: 'var(--text-primary)', border: `1px solid ${divider}` }}>
+              <X size={15} />
+              Close
+            </motion.button>
+          </div>
         )}
         {loading && (
-          <div className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-mono opacity-40"
-            style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)', border: `1px solid ${divider}`, color: 'var(--text-faint)' }}>
-            <motion.div className="w-3 h-3 rounded-full border border-green-500 border-t-transparent"
-              animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity }} />
-            AI working — available once scaffold is ready
+          <div className="flex gap-2">
+            <div className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-mono opacity-40"
+              style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)', border: `1px solid ${divider}`, color: 'var(--text-faint)' }}>
+              <motion.div className="w-3 h-3 rounded-full border border-green-500 border-t-transparent"
+                animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity }} />
+              AI working — available once scaffold is ready
+            </div>
+            <motion.button onClick={onClose}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl text-sm font-semibold"
+              style={{ background: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)', color: 'var(--text-primary)', border: `1px solid ${divider}` }}>
+              <X size={15} />
+              Close
+            </motion.button>
           </div>
         )}
         <p className="text-center text-[10px] font-mono mt-2" style={{ color: 'var(--text-faint)' }}>
@@ -476,6 +477,7 @@ const PanicModePanel: React.FC<PanicModePanelProps> = ({
         </p>
       </div>
     </motion.div>
+    </>
   );
 };
 

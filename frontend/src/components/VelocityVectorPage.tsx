@@ -289,11 +289,13 @@ const VelocityVectorPage: React.FC = () => {
             >
               {vector ? (
                 <>
+                  <div data-tour="tour-vector-arrow">
                   <BigVectorArrow
                     magnitude={vector.magnitude}
                     direction={vector.direction}
                     alignment={vector.alignment}
                   />
+                  </div>
 
                   <div className="mt-4 text-center">
                     <div className="text-xl font-black" style={{ color: dirColor }}>
@@ -345,7 +347,7 @@ const VelocityVectorPage: React.FC = () => {
 
           {/* Right — Per-task breakdown */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center gap-2 mb-2">
+            <div data-tour="tour-drift-section" className="inline-flex items-center gap-2 mb-2">
               <Activity size={11} style={{ color: 'var(--text-faint)' }} />
               <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>
                 Tasks dragging the vector

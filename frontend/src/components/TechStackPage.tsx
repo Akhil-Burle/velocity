@@ -187,9 +187,11 @@ const TechStackPage: React.FC = () => {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-2">
-          <Layers size={13} style={{ color: '#4285f4' }} />
-          <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>
-            Tech Stack
+          <span data-tour="tour-tech-stack-header" className="flex items-center gap-2">
+            <Layers size={13} style={{ color: '#4285f4' }} />
+            <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>
+              Tech Stack
+            </span>
           </span>
         </div>
         <h1 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>

@@ -37,12 +37,22 @@ const HotStartPanel: React.FC<HotStartPanelProps> = ({ taskName, code, isDark = 
   const whyBorder = isDark ? 'rgba(34,197,94,0.1)' : 'rgba(34,197,94,0.18)';
 
   return (
-    <motion.div
-      initial={{ x: '100%', opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: '100%', opacity: 0 }}
-      transition={{ type: 'spring', stiffness: 280, damping: 30 }}
-      className="fixed top-0 right-0 h-full w-full max-w-[480px] z-40 flex flex-col"
-      style={{ background: panelBg, borderLeft: `1px solid ${panelBorder}`, boxShadow: `-20px 0 60px rgba(0,0,0,0.45), -4px 0 24px rgba(34,197,94,0.05)` }}
-    >
+    <>
+      {/* Dim backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        onClick={onClose}
+        className="fixed inset-x-0 bottom-0 z-[49]"
+        style={{ top: 57, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}
+      />
+
+      <motion.div
+        initial={{ x: '100%', opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: '100%', opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 280, damping: 30 }}
+        className="fixed right-0 bottom-0 w-full max-w-[480px] z-50 flex flex-col"
+        style={{ top: 57, background: panelBg, borderLeft: `1px solid ${panelBorder}`, boxShadow: `-20px 0 60px rgba(0,0,0,0.45), -4px 0 24px rgba(34,197,94,0.05)` }}
+      >
       {/* Title bar */}
       <div className="flex items-center justify-between px-4 py-3 shrink-0"
         style={{ borderBottom: `1px solid ${divider}`, background: titleBarBg }}>
@@ -55,20 +65,14 @@ const HotStartPanel: React.FC<HotStartPanelProps> = ({ taskName, code, isDark = 
           <div className="flex items-center gap-2">
             <Zap size={12} className="text-green-400" />
             <span className="text-xs font-mono font-semibold tracking-wide" style={{ color: 'var(--text-secondary)' }}>HOT-START Scaffold</span>
-            <span className="text-xs font-mono" style={{ color: 'var(--text-faint)' }}>[{taskName}]</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <motion.button onClick={handleCopy} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono transition-colors"
-            style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', color: 'var(--text-tertiary)' }}>
-            {copied ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
-            {copied ? 'Copied' : 'Copy'}
-          </motion.button>
-          <motion.button onClick={onClose} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} style={{ color: 'var(--text-faint)' }}>
-            <X size={15} />
-          </motion.button>
-        </div>
+        <motion.button onClick={handleCopy} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono transition-colors"
+          style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', color: 'var(--text-tertiary)' }}>
+          {copied ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
+          {copied ? 'Copied' : 'Copy'}
+        </motion.button>
       </div>
 
       {/* Tab bar */}
@@ -125,19 +129,29 @@ const HotStartPanel: React.FC<HotStartPanelProps> = ({ taskName, code, isDark = 
         </AnimatePresence>
       </div>
 
-      {/* Mark Complete */}
+      {/* Mark Complete + Close */}
       <div className="shrink-0 px-4 py-4" style={{ borderTop: `1px solid ${divider}` }}>
-        <motion.button onClick={onMarkComplete}
-          whileHover={{ scale: 1.02, boxShadow: '0 0 24px rgba(34,197,94,0.25)' }} whileTap={{ scale: 0.97 }}
-          className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl text-sm font-semibold text-black"
-          style={{ background: 'linear-gradient(135deg,#22c55e 0%,#16a34a 100%)' }}>
-          <CheckCircle size={15} />Mark Task Complete
-        </motion.button>
+        <div className="flex gap-2">
+          <motion.button onClick={onMarkComplete}
+            whileHover={{ scale: 1.02, boxShadow: '0 0 24px rgba(34,197,94,0.25)' }} whileTap={{ scale: 0.97 }}
+            className="flex-1 flex items-center justify-center gap-2.5 py-3 rounded-xl text-sm font-semibold text-black"
+            style={{ background: 'linear-gradient(135deg,#22c55e 0%,#16a34a 100%)' }}>
+            <CheckCircle size={15} />Mark Task Complete
+          </motion.button>
+          <motion.button onClick={onClose}
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+            className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl text-sm font-semibold"
+            style={{ background: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)', color: 'var(--text-primary)', border: `1px solid ${divider}` }}>
+            <X size={15} />
+            Close
+          </motion.button>
+        </div>
         <p className="text-center text-[10px] font-mono mt-2" style={{ color: 'var(--text-faint)' }}>
           Marks complete · dismisses panel · recalibrates board
         </p>
       </div>
     </motion.div>
+    </>
   );
 };
 

@@ -17,6 +17,7 @@ import AgentLogPage from './components/AgentLogPage';
 import TechStackPage from './components/TechStackPage';
 import VelocityVectorPage from './components/VelocityVectorPage';
 import { ToastProvider } from './components/Toast';
+import { TourProvider } from './components/TourContext';
 import { Zap } from 'lucide-react';
 
 const pageVariants = {
@@ -158,7 +159,9 @@ function App() {
       <AuthProvider>
         <CreditsProvider>
           <ToastProvider>
-            <AppInner />
+            <TourProvider>
+              <AppInner />
+            </TourProvider>
           </ToastProvider>
         </CreditsProvider>
       </AuthProvider>

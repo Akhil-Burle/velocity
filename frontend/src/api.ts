@@ -268,6 +268,17 @@ export async function runReschedule(): Promise<{
   return request('/reschedule', { method: 'POST', body: JSON.stringify({}) });
 }
 
+/** POST /api/calendar/sync — push Velocity schedule to Google Calendar (test user only) */
+export async function pushCalendarSync(): Promise<{
+  success: boolean;
+  message: string;
+  created: number;
+  deleted: number;
+  errors: string[];
+}> {
+  return request('/calendar/sync', { method: 'POST', body: JSON.stringify({}) });
+}
+
 // ─── Insights ─────────────────────────────────────────────────────────────────
 
 export async function generateInsights(): Promise<InsightsReport> {

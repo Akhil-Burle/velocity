@@ -11,7 +11,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Zap, LayoutGrid, Target, Calendar, TrendingUp, Settings,
-  Sun, Moon, Bell, X, ChevronRight, AlertTriangle, Clock, CalendarRange, Bot, Layers, Activity, LogOut,
+  Sun, Moon, Bell, X, ChevronRight, AlertTriangle, Clock, CalendarRange, Bot, Layers, Activity, LogOut, FileCode,
 } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
 import { useAuth } from '../AuthContext';
@@ -21,6 +21,11 @@ import CreditsTicker from './CreditsTicker';
 import VelocityVectorIndicator from './VelocityVector';
 import ContextualHints from './ContextualHints';
 import TourReOpenButton from './TourReOpenButton';
+import OmniBar from './OmniBar';
+
+// Detect OS for keyboard shortcut label
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+const KBD_LABEL = IS_MAC ? '⌘K' : 'Ctrl+K';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -34,7 +39,6 @@ const NAV_ITEMS = [
   { path: '/insights',  icon: TrendingUp,   label: 'Insights' },
   { path: '/agent-log', icon: Bot,          label: 'Agent Log', highlight: true },
   { path: '/velocity-vector', icon: Activity, label: 'Velocity Vector', highlight: true },
-  { path: '/tech-stack',icon: Layers,       label: 'Tech Stack' },
   { path: '/settings',  icon: Settings,     label: 'Settings' },
 ];
 
@@ -214,6 +218,36 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
 
+  // ── Global OmniBar state ─────────────────────────────────────────────────
+  const [omniBarOpen, setOmniBarOpen] = useState(false);
+  const [omniInitialValue, setOmniInitialValue] = useState<string | undefined>(undefined);
+
+  // ── Global Ctrl/Cmd+K shortcut ───────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setOmniBarOpen(true);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
+  // ── Pick up task description carried over from the landing hero ──────────
+  // When a visitor types in the landing hero task bar, it's stored in
+  // sessionStorage so the OmniBar opens pre-filled on first dashboard load.
+  useEffect(() => {
+    let pending: string | null = null;
+    try { pending = sessionStorage.getItem('velocity_pending_omni'); } catch { /* ignore */ }
+    if (pending && pending.trim()) {
+      try { sessionStorage.removeItem('velocity_pending_omni'); } catch { /* ignore */ }
+      setOmniInitialValue(pending.trim());
+      const t = setTimeout(() => setOmniBarOpen(true), 1100);
+      return () => clearTimeout(t);
+    }
+  }, []);
+
   const handleLogout = () => {
     setAvatarMenuOpen(false);
     logout();
@@ -303,7 +337,6 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
           </motion.div>
           <div className="flex items-baseline gap-1.5">
             <span className="font-bold text-sm tracking-tight" style={{ color: 'var(--text-primary)' }}>Velocity</span>
-            <span className="text-xs font-mono hidden sm:inline" style={{ color: 'var(--text-faint)' }}>v2</span>
           </div>
         </div>
 
@@ -349,8 +382,46 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
           })}
         </nav>
 
-        {/* Bottom — theme toggle */}
-        <div className="px-4 py-4 shrink-0" style={{ borderTop: `1px solid ${surfaceBorder}` }}>
+        {/* Bottom — tech stack + theme toggle */}
+        <div className="px-4 py-4 shrink-0 space-y-2" style={{ borderTop: `1px solid ${surfaceBorder}` }}>
+          {/* Tech Stack button */}
+          <NavLink to="/tech-stack" onClick={() => setSidebarOpen(false)}>
+            <motion.div
+              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all"
+              style={{
+                background: location.pathname === '/tech-stack' ? 'rgba(66,133,244,0.1)' : 'rgba(66,133,244,0.05)',
+                border: location.pathname === '/tech-stack' ? '1px solid rgba(66,133,244,0.3)' : '1px solid rgba(66,133,244,0.15)',
+                color: '#4285f4',
+              }}>
+              <Layers size={14} />
+              <span className="text-xs font-medium">Tech Stack</span>
+              {['#4285f4','#ea4335','#fbbc04','#34a853'].map(c => (
+                <span key={c} className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c }} />
+              ))}
+            </motion.div>
+          </NavLink>
+
+          {/* API Docs button */}
+          <NavLink to="/api-docs" onClick={() => setSidebarOpen(false)}>
+            <motion.div
+              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all"
+              style={{
+                background: location.pathname === '/api-docs' ? 'rgba(96,165,250,0.1)' : 'rgba(96,165,250,0.05)',
+                border: location.pathname === '/api-docs' ? '1px solid rgba(96,165,250,0.3)' : '1px solid rgba(96,165,250,0.15)',
+                color: '#60a5fa',
+              }}>
+              <FileCode size={14} />
+              <span className="text-xs font-medium">API Docs</span>
+              <span className="text-[9px] font-mono ml-auto px-1 py-0.5 rounded"
+                style={{ background: 'rgba(96,165,250,0.1)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.2)' }}>
+                58
+              </span>
+            </motion.div>
+          </NavLink>
+
+          {/* Theme toggle */}
           <motion.button
             onClick={e => { const r = e.currentTarget.getBoundingClientRect(); toggle(r.left + r.width / 2, r.top + r.height / 2); }}
             whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.94 }}
@@ -398,7 +469,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
           {/* Page title breadcrumb */}
           <div className="flex items-center gap-2 ml-2 lg:ml-0">
             <span className="text-xs font-mono" style={{ color: 'var(--text-faint)' }}>
-              {NAV_ITEMS.find(n => n.path === location.pathname)?.label || 'Dashboard'}
+              {NAV_ITEMS.find(n => n.path === location.pathname)?.label ?? (location.pathname === '/tech-stack' ? 'Tech Stack' : location.pathname === '/api-docs' ? 'API Docs' : 'Dashboard')}
             </span>
           </div>
 
@@ -418,6 +489,23 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
             {/* Velocity Credits ticker — persistent across all pages */}
             <CreditsTicker isDark={isDark} surfaceBorder={surfaceBorder} />
+
+            {/* ⌘K / Ctrl+K OmniBar pill — visible on all pages */}
+            <motion.button
+              onClick={() => setOmniBarOpen(true)}
+              whileHover={{ scale: 1.05, boxShadow: '0 0 12px rgba(34,197,94,0.25)' }}
+              whileTap={{ scale: 0.95 }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-mono font-semibold"
+              style={{
+                background: 'rgba(34,197,94,0.08)',
+                color: '#4ade80',
+                border: '1px solid rgba(34,197,94,0.22)',
+              }}
+              title={`Open command palette (${KBD_LABEL})`}
+            >
+              <span style={{ fontSize: 11 }}>⌨</span>
+              <span className="hidden sm:inline">{KBD_LABEL}</span>
+            </motion.button>
 
             {/* Notification bell */}
             <NotificationBell isDark={isDark} surfaceBorder={surfaceBorder} />
@@ -485,6 +573,22 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
       {/* Contextual hints — page-aware, non-blocking, shares state with StartHereCard */}
       <ContextualHints />
+
+      {/* Global OmniBar — accessible via Ctrl/Cmd+K on every page */}
+      <OmniBar
+        isOpen={omniBarOpen}
+        onClose={() => { setOmniBarOpen(false); setOmniInitialValue(undefined); }}
+        initialValue={omniInitialValue}
+        onActionComplete={(intent) => {
+          // Notify Dashboard (if mounted) to refresh its task list
+          const actionsNeedingRefresh = ['create_task', 'run_triage', 'panic_mode', 'negotiate', 'rebalance', 'smart_routing'];
+          if (actionsNeedingRefresh.includes(intent)) {
+            window.dispatchEvent(new CustomEvent('velocity:omni-action', { detail: { intent } }));
+          }
+        }}
+        isDark={isDark}
+        tasks={[]}
+      />
     </div>
   );
 };

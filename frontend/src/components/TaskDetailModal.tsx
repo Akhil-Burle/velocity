@@ -119,19 +119,19 @@ const StatCard: React.FC<{
   icon: React.ReactNode; label: string; value: React.ReactNode; sub?: string;
   color: string; isDark: boolean; emphasis?: boolean;
 }> = ({ icon, label, value, sub, color, isDark, emphasis }) => (
-  <div className="rounded-2xl px-4 py-3.5 flex flex-col gap-1.5 relative overflow-hidden"
+  <div className="rounded-2xl px-4 py-3 flex flex-col gap-1.5 relative overflow-hidden"
     style={{
-      background: emphasis ? `${color}12` : (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)'),
-      border: `1px solid ${emphasis ? `${color}33` : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)')}`,
+      background: emphasis ? `${color}10` : (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)'),
+      border: `1px solid ${emphasis ? `${color}2e` : (isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)')}`,
     }}>
     <div className="flex items-center gap-1.5">
       <span style={{ color }}>{icon}</span>
-      <span className="text-[11px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>{label}</span>
+      <span className="text-[11px] font-mono uppercase tracking-wider" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)' }}>{label}</span>
     </div>
-    <div className="font-black font-mono leading-none" style={{ color, fontSize: emphasis ? '2rem' : '1.6rem' }}>
+    <div className="font-black font-mono leading-none" style={{ color, fontSize: emphasis ? '1.55rem' : '1.25rem' }}>
       {value}
     </div>
-    {sub && <div className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{sub}</div>}
+    {sub && <div className="text-[11px] font-mono leading-snug" style={{ color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(15,23,42,0.6)' }}>{sub}</div>}
   </div>
 );
 
@@ -141,13 +141,13 @@ const SectionCard: React.FC<{
   right?: React.ReactNode; children: React.ReactNode; bodyClass?: string; pad?: boolean;
 }> = ({ icon, title, accent, isDark, right, children, bodyClass = '', pad = true }) => {
   const sectionBg = isDark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.022)';
-  const sectionBorder = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)';
+  const sectionBorder = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)';
   return (
     <div className="rounded-2xl overflow-hidden" style={{ background: sectionBg, border: `1px solid ${sectionBorder}` }}>
       <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: `1px solid ${sectionBorder}` }}>
         <div className="flex items-center gap-2">
           <span style={{ color: accent || 'var(--text-faint)' }}>{icon}</span>
-          <span className="text-[11px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{title}</span>
+          <span className="text-[12px] font-mono uppercase tracking-wider font-semibold" style={{ color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(15,23,42,0.65)' }}>{title}</span>
         </div>
         {right}
       </div>
@@ -158,11 +158,11 @@ const SectionCard: React.FC<{
 
 // ── Meta stat (small label/value row) ─────────────────────────────────────────
 const MetaStat: React.FC<{ icon: React.ReactNode; label: string; value: string; color?: string }> = ({ icon, label, value, color }) => (
-  <div className="flex items-center justify-between py-2">
-    <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+  <div className="flex items-center justify-between py-2.5">
+    <span className="flex items-center gap-2 text-[12px] font-mono" style={{ color: 'var(--text-muted)' }}>
       <span style={{ color: 'var(--text-faint)' }}>{icon}</span>{label}
     </span>
-    <span className="text-xs font-semibold font-mono" style={{ color: color || 'var(--text-primary)' }}>{value}</span>
+    <span className="text-[12px] font-semibold font-mono" style={{ color: color || 'var(--text-primary)' }}>{value}</span>
   </div>
 );
 
@@ -322,24 +322,38 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const dividerColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)';
   const headerBg = isDark ? 'rgba(15,20,27,0.85)' : 'rgba(255,255,255,0.85)';
 
+  // Lock body scroll while modal is open
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
-      style={{ background: isDark ? 'rgba(0,0,0,0.82)' : 'rgba(0,0,0,0.5)', backdropFilter: 'blur(16px)' }}
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{
+        paddingTop: 72,     // below the top header bar
+        paddingLeft: 220,   // right of the sidebar
+        paddingRight: 20,
+        paddingBottom: 20,
+        background: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.25)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+      }}
       onClick={onClose}
     >
       <motion.div
-        initial={{ y: 40, opacity: 0, scale: 0.98 }} animate={{ y: 0, opacity: 1, scale: 1 }}
-        exit={{ y: 24, opacity: 0, scale: 0.98 }}
+        initial={{ y: 32, opacity: 0, scale: 0.97 }} animate={{ y: 0, opacity: 1, scale: 1 }}
+        exit={{ y: 20, opacity: 0, scale: 0.97 }}
         transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-        className="w-full sm:w-[96vw] max-w-6xl flex flex-col rounded-t-3xl sm:rounded-3xl overflow-hidden"
+        className="w-full max-w-6xl flex flex-col rounded-3xl overflow-hidden"
         style={{
           background: modalBg,
-          maxHeight: 'calc(100dvh - 72px)',
-          marginTop: '72px',
+          maxHeight: '100%',
           border: `1px solid rgba(${cfg.glowRgb},0.28)`,
-          boxShadow: `0 0 0 1px rgba(${cfg.glowRgb},0.1), 0 40px 100px ${isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.22)'}`,
+          boxShadow: `0 0 0 1px rgba(${cfg.glowRgb},0.1), 0 32px 80px ${isDark ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.18)'}`,
         }}
         onClick={e => e.stopPropagation()}
       >

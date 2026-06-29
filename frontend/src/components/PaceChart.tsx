@@ -171,7 +171,39 @@ const ChartTooltip: React.FC<{
   );
 };
 
-// ── Legend item ───────────────────────────────────────────────────────────────
+// ── Compact tooltip ───────────────────────────────────────────────────────────
+const CompactTooltip: React.FC<{
+  active?: boolean;
+  payload?: Array<{ name: string; value: number | null; color: string }>;
+  isDark: boolean;
+}> = ({ active, payload, isDark }) => {
+  if (!active || !payload?.length) return null;
+  const entries = payload.filter(p => p.value !== null && p.name !== 'projected');
+  if (!entries.length) return null;
+  return (
+    <div style={{
+      background: isDark ? 'rgba(10,14,20,0.96)' : 'rgba(248,250,252,0.97)',
+      border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+      borderRadius: 7,
+      padding: '5px 8px',
+      backdropFilter: 'blur(12px)',
+      boxShadow: isDark ? '0 4px 16px rgba(0,0,0,0.5)' : '0 2px 10px rgba(0,0,0,0.1)',
+      fontSize: 10,
+      fontFamily: 'JetBrains Mono, monospace',
+      pointerEvents: 'none',
+    }}>
+      {entries.map(p => (
+        <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: p.color, display: 'inline-block', flexShrink: 0 }} />
+          <span style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)', fontSize: 9 }}>
+            {p.name === 'expected' ? 'exp' : 'act'}:
+          </span>
+          <span style={{ color: p.color, fontWeight: 700 }}>{Math.round(p.value as number)}%</span>
+        </div>
+      ))}
+    </div>
+  );
+};
 const LegendItem: React.FC<{ color: string; label: string; dashed?: boolean }> = ({ color, label, dashed }) => (
   <span className="flex items-center gap-1.5 text-[9px] font-mono" style={{ color: 'var(--text-faint)' }}>
     <span style={{
@@ -230,7 +262,8 @@ const PaceChart: React.FC<PaceChartProps> = ({ task, isDark = true, compact = fa
               dot={false} connectNulls
               isAnimationActive
               animationDuration={900}
-              animationEasing="ease-out" />
+              animationEasing="ease-out"
+              activeDot={{ r: 3.5, fill: accent, strokeWidth: 2, stroke: isDark ? '#0d1117' : '#fff' }} />
 
             {/* Projected ghost */}
             <Line type="monotone" dataKey="projected"
@@ -243,6 +276,10 @@ const PaceChart: React.FC<PaceChartProps> = ({ task, isDark = true, compact = fa
               stroke={isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'}
               strokeWidth={1} />
 
+            <Tooltip
+              content={<CompactTooltip isDark={isDark} />}
+              cursor={{ stroke: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)', strokeWidth: 1 }}
+            />
             <XAxis dataKey="t" type="number" domain={['dataMin', 'dataMax']} hide />
             <YAxis domain={[0, 100]} hide />
           </ComposedChart>

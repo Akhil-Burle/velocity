@@ -5,7 +5,7 @@
  * dashboard task-entry bar. Includes real Web Speech API voice input,
  * and Chaos Scanner (image drop zone) in expanded mode.
  */
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Mic, MicOff, Zap, Calendar, Camera } from 'lucide-react';
 import WaveformAnimation from './WaveformAnimation';
@@ -31,7 +31,11 @@ declare global {
   }
 }
 
-const BrainDumpInput: React.FC<BrainDumpInputProps> = ({
+export interface BrainDumpInputHandle {
+  focus: () => void;
+}
+
+const BrainDumpInput = forwardRef<BrainDumpInputHandle, BrainDumpInputProps>(({
   onSubmit,
   onTasksExtracted,
   placeholder = 'Paste your tasks or describe your workload...',
@@ -40,7 +44,7 @@ const BrainDumpInput: React.FC<BrainDumpInputProps> = ({
   isDark = true,
   showCalendar = false,
   defaultValue = '',
-}) => {
+}, ref) => {
   const [value, setValue] = useState(defaultValue);
   const [inputFocused, setInputFocused] = useState(false);
   const [calendarSync, setCalendarSync] = useState(false);
@@ -50,6 +54,11 @@ const BrainDumpInput: React.FC<BrainDumpInputProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  // Expose focus() to parent via ref
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus(),
+  }));
 
   // Check for Web Speech API support
   useEffect(() => {
@@ -279,6 +288,8 @@ const BrainDumpInput: React.FC<BrainDumpInputProps> = ({
       </AnimatePresence>
     </div>
   );
-};
+});
+
+BrainDumpInput.displayName = 'BrainDumpInput';
 
 export default BrainDumpInput;

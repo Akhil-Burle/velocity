@@ -156,17 +156,24 @@ export interface InsightsReport {
 
 export interface CalendarEvent {
   id: string;
-  taskId: string;
+  type?: 'focus' | 'buffer' | 'meeting';
+  taskId: string | null;
   taskName: string;
-  subtaskId?: string;    // for mark-complete + reschedule
+  subtaskId?: string;        // for mark-complete + reschedule
   subtaskTitle: string;
-  date: string;          // "YYYY-MM-DD"
-  startTime: string;     // "HH:MM"
-  endTime: string;       // "HH:MM"
+  date: string;              // "YYYY-MM-DD"
+  startTime: string;         // "HH:MM"
+  endTime: string;           // "HH:MM"
   status: PaceStatus;
   taskType: TaskType;
   estimatedMinutes?: number;
-  completed?: boolean;   // tracked in frontend state
+  durationMins?: number;
+  energyLevel?: string;
+  completionPercent?: number;
+  deadline?: string;
+  cognitiveWeight?: string;
+  completed?: boolean;       // tracked in frontend state
+  task?: Task | null;        // full task object for TaskDetailModal
 }
 
 // ── Gamification — Velocity Credits ───────────────────────────────────────────

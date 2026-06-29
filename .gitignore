@@ -23,3 +23,10 @@ dist-ssr
 .env
 .kiro
 .vscode
+
+deployment-checklist.md
+deployment-commands.sh
+publish.txt
+FEATURES.md
+feature-precise.md
+features-judges.md

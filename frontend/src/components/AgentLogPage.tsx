@@ -583,6 +583,8 @@ const AgentLogPage: React.FC = () => {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
   const [filterKey, setFilterKey] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
   // Phase 4: deep-link from Start Here card
   const [activeTab, setActiveTab] = useState<'log' | 'memory'>(() => {
     const hint = sessionStorage.getItem('agent_log_tab');
@@ -617,6 +619,8 @@ const AgentLogPage: React.FC = () => {
 
   const featureKeys = Array.from(new Set(entries.map(e => e.featureKey)));
   const filtered = filterKey ? entries.filter(e => e.featureKey === filterKey) : entries;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const tabs = [
     { id: 'log' as const,    label: 'Activity Log',     icon: <Bot size={11} />,          count: entries.length },
@@ -625,6 +629,52 @@ const AgentLogPage: React.FC = () => {
 
   return (
     <div className="px-4 sm:px-6 py-6 pb-16">
+
+      {/* ── How This Works ──────────────────────────────────────────────────── */}
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="mb-6 rounded-2xl overflow-hidden"
+        style={{ background: isDark ? 'rgba(34,197,94,0.05)' : 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.2)' }}>
+        <div className="px-5 py-3 flex items-center gap-2"
+          style={{ borderBottom: '1px solid rgba(34,197,94,0.12)' }}>
+          <Bot size={11} style={{ color: '#22c55e' }} />
+          <span className="text-[10px] font-mono uppercase tracking-widest font-semibold" style={{ color: '#22c55e' }}>
+            How This Works
+          </span>
+        </div>
+        <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[
+            {
+              step: '01',
+              title: 'Agent acts autonomously',
+              body: 'Velocity monitors drift, deadlines, and behavioral signals in the background. When a threshold is crossed it acts — no button needed.',
+              color: '#22c55e',
+            },
+            {
+              step: '02',
+              title: 'Every action is logged',
+              body: 'Each autonomous decision is recorded here with a timestamp, the AI\'s reasoning, and what actually happened — fully transparent.',
+              color: '#f59e0b',
+            },
+            {
+              step: '03',
+              title: 'You stay in control',
+              body: 'Every action can be undone individually. Cancel the same action type 3 times and the agent learns your preference via Policy Memory.',
+              color: '#ef4444',
+            },
+          ].map(({ step, title, body, color }) => (
+            <div key={step} className="flex gap-3">
+              <span className="text-2xl font-black font-mono leading-none shrink-0 mt-0.5"
+                style={{ color: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.12)' }}>{step}</span>
+              <div>
+                <div className="text-[11px] font-semibold mb-1" style={{ color }}>{title}</div>
+                <div className="text-[11px] font-mono leading-relaxed" style={{ color: 'var(--text-faint)' }}>{body}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+
       {/* Header */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
@@ -641,9 +691,6 @@ const AgentLogPage: React.FC = () => {
               </motion.span>
             )}
           </div>
-          <p className="text-[11px] font-mono" style={{ color: 'var(--text-faint)' }}>
-            Every action Velocity took autonomously — timestamped, reasoned, undoable.
-          </p>
         </div>
         <motion.button onClick={load} whileHover={{ scale: 1.08, rotate: 180 }} whileTap={{ scale: 0.9 }}
           transition={{ duration: 0.4 }}
@@ -686,7 +733,7 @@ const AgentLogPage: React.FC = () => {
           {/* Feature filter pills */}
           {!loading && featureKeys.length > 1 && (
             <div className="flex flex-wrap gap-2 mb-4">
-              <button onClick={() => setFilterKey(null)}
+              <button onClick={() => { setFilterKey(null); setPage(1); }}
                 className="text-[10px] font-mono px-3 py-1.5 rounded-full"
                 style={{
                   background: !filterKey ? 'rgba(34,197,94,0.12)' : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'),
@@ -700,8 +747,9 @@ const AgentLogPage: React.FC = () => {
                 const count = entries.filter(e => e.featureKey === key).length;
                 const isActive = filterKey === key;
                 return (
-                  <button key={key} onClick={() => setFilterKey(isActive ? null : key)}
+                  <button key={key}
                     className="flex items-center gap-1.5 text-[10px] font-mono px-3 py-1.5 rounded-full"
+                    onClick={() => { setFilterKey(isActive ? null : key); setPage(1); }}
                     style={{
                       background: isActive ? `${meta?.color || '#94a3b8'}14` : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'),
                       color: isActive ? (meta?.color || '#94a3b8') : 'var(--text-faint)',
@@ -753,32 +801,59 @@ const AgentLogPage: React.FC = () => {
           {!loading && filtered.length > 0 && (
             <div className="space-y-2">
               <AnimatePresence mode="popLayout">
-                {filtered.map((entry, i) => (
+                {paginated.map((entry, i) => (
                   <LogCard key={entry.id} entry={entry} idx={i} isDark={isDark}
                     surfaceBg={surfaceBg} surfaceBorder={surfaceBorder} divider={divider}
                     onUndo={handleUndo} onUndoStep={handleUndoStep} />
                 ))}
               </AnimatePresence>
-            </div>
-          )}
 
-          {/* How agentic depth works explainer */}
-          {!loading && entries.length > 0 && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-              className="mt-6 px-4 py-4 rounded-xl"
-              style={{ background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)' }}>
-              <div className="flex items-center gap-2 mb-2">
-                <Bot size={11} style={{ color: '#22c55e' }} />
-                <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: '#22c55e' }}>
-                  How Agentic Depth works
-                </span>
-              </div>
-              <p className="text-[11px] font-mono leading-relaxed" style={{ color: 'var(--text-faint)' }}>
-                <span style={{ color: '#ef4444' }}>AUTONOMOUS</span> actions happen without any user trigger — AI detects a condition and acts. {' '}
-                <span style={{ color: '#818cf8' }}>ACTION CHAINS</span> happen when one action's outcome triggers a second autonomous action, forming a causal cascade. {' '}
-                Expand any entry to see the full reasoning trace and "Why this, not something else?" alternatives considered.
-              </p>
-            </motion.div>
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4 mt-2"
+                  style={{ borderTop: `1px solid ${divider}` }}>
+                  <span className="text-[10px] font-mono" style={{ color: 'var(--text-faint)' }}>
+                    {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="px-3 py-1.5 rounded-lg text-[10px] font-mono font-semibold disabled:opacity-30"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', color: 'var(--text-muted)', border: `1px solid ${surfaceBorder}` }}>
+                      ← Prev
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(n => n === 1 || n === totalPages || Math.abs(n - page) <= 1)
+                      .reduce<(number | '…')[]>((acc, n, idx, arr) => {
+                        if (idx > 0 && typeof arr[idx - 1] === 'number' && (n as number) - (arr[idx - 1] as number) > 1) acc.push('…');
+                        acc.push(n);
+                        return acc;
+                      }, [])
+                      .map((n, i) => n === '…' ? (
+                        <span key={`ellipsis-${i}`} className="px-1 text-[10px] font-mono" style={{ color: 'var(--text-faint)' }}>…</span>
+                      ) : (
+                        <button key={n} onClick={() => setPage(n as number)}
+                          className="w-7 h-7 rounded-lg text-[10px] font-mono font-semibold"
+                          style={{
+                            background: page === n ? 'rgba(34,197,94,0.15)' : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'),
+                            color: page === n ? '#22c55e' : 'var(--text-faint)',
+                            border: `1px solid ${page === n ? 'rgba(34,197,94,0.3)' : surfaceBorder}`,
+                          }}>
+                          {n}
+                        </button>
+                      ))}
+                    <button
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      className="px-3 py-1.5 rounded-lg text-[10px] font-mono font-semibold disabled:opacity-30"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', color: 'var(--text-muted)', border: `1px solid ${surfaceBorder}` }}>
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </>
       )}

@@ -55,14 +55,100 @@ const STATUS_COLOR: Record<string, string> = {
   GREEN: '#22c55e', AMBER: '#f59e0b', RED: '#ef4444', COMPLETE: '#38bdf8', failed: '#6b7280',
 };
 
+// ── Sticky section nav ────────────────────────────────────────────────────────
+const NAV_ITEMS = [
+  { id: 'sec-dna',         label: 'DNA',        color: '#a855f7', icon: Fingerprint },
+  { id: 'sec-credits',     label: 'Credits',    color: '#22c55e', icon: Trophy },
+  { id: 'sec-weekly',      label: 'Weekly',     color: '#22c55e', icon: TrendingUp },
+  { id: 'sec-portfolio',   label: 'Portfolio',  color: '#38bdf8', icon: Layers },
+  { id: 'sec-status',      label: 'Status',     color: '#a855f7', icon: ListChecks },
+  { id: 'sec-habits',      label: 'Habits',     color: '#f97316', icon: Heart },
+  { id: 'sec-goals',       label: 'Goals',      color: '#a855f7', icon: Target },
+  { id: 'sec-drift',       label: 'Drift',      color: '#f97316', icon: Brain },
+  { id: 'sec-achievements',label: 'Awards',     color: '#fbbf24', icon: Medal },
+  { id: 'sec-prebrief',    label: 'Pre-Brief',  color: '#38bdf8', icon: Sunrise },
+  { id: 'sec-impact',      label: 'Impact',     color: '#22c55e', icon: Activity },
+  { id: 'sec-calibration', label: 'Calibrate',  color: '#38bdf8', icon: BarChart2 },
+];
+
+const InsightsNav: React.FC<{ isDark: boolean }> = ({ isDark }) => {
+  const [active, setActive] = useState<string>('');
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        entries.forEach(e => { if (e.isIntersecting) setActive(e.target.id); });
+      },
+      { rootMargin: '-30% 0px -60% 0px', threshold: 0 }
+    );
+    NAV_ITEMS.forEach(({ id }) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  const scrollTo = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  return (
+    <div className="hidden lg:flex flex-col gap-1 fixed right-4 top-1/2 -translate-y-1/2 z-30"
+      style={{ width: 148 }}>
+      <div className="rounded-2xl overflow-hidden py-2"
+        style={{
+          background: isDark ? 'rgba(10,14,20,0.92)' : 'rgba(248,250,252,0.95)',
+          border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`,
+          backdropFilter: 'blur(20px)',
+          boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.4)' : '0 4px 20px rgba(0,0,0,0.08)',
+        }}>
+        <div className="px-3 pb-2 pt-1"
+          style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}` }}>
+          <span className="text-[9px] font-mono uppercase tracking-widest" style={{ color: 'var(--text-faint)' }}>
+            Sections
+          </span>
+        </div>
+        {NAV_ITEMS.map(({ id, label, color, icon: Icon }) => {
+          const isActive = active === id;
+          return (
+            <button key={id} onClick={() => scrollTo(id)}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-all"
+              style={{
+                background: isActive ? `${color}12` : 'transparent',
+                borderLeft: `2px solid ${isActive ? color : 'transparent'}`,
+              }}
+              onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'; }}
+              onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+            >
+              <Icon size={10} style={{ color: isActive ? color : 'var(--text-faint)', flexShrink: 0 }} />
+              <span className="text-[10px] font-mono truncate"
+                style={{ color: isActive ? color : 'var(--text-faint)', fontWeight: isActive ? 700 : 400 }}>
+                {label}
+              </span>
+              {isActive && (
+                <motion.div layoutId="nav-dot"
+                  className="ml-auto w-1 h-1 rounded-full shrink-0"
+                  style={{ background: color }} />
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 // ── Shared section card shell ─────────────────────────────────────────────────
 const Section: React.FC<{
   icon: React.ReactNode; label: string; accent?: string;
   right?: React.ReactNode; tooltip?: string; delay?: number;
   surfaceBg: string; surfaceBorder: string; divider: string;
   children: React.ReactNode;
-}> = ({ icon, label, accent, right, tooltip, surfaceBg, surfaceBorder, divider, delay = 0, children }) => (
+  id?: string;
+}> = ({ icon, label, accent, right, tooltip, surfaceBg, surfaceBorder, divider, delay = 0, children, id }) => (
   <motion.div
+    id={id}
     initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
     transition={{ delay, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
     className="rounded-xl overflow-hidden"
@@ -258,7 +344,12 @@ const InsightsPage: React.FC = () => {
   );
 
   return (
-    <div className="px-4 sm:px-6 py-6 pb-20">
+    <div className="flex min-h-screen">
+      {/* ── Sticky section nav ─────────────────────────────────────────────── */}
+      <InsightsNav isDark={isDark} />
+
+      {/* ── Main content ────────────────────────────────────────────────────── */}
+      <div className="flex-1 min-w-0 px-4 sm:px-6 py-6 pb-20" style={{ marginRight: 168 }}>
 
 
       {/* ── Header ───────────────────────────────────────────────────────── */}
@@ -342,7 +433,7 @@ const InsightsPage: React.FC = () => {
       {/* ── Row 2: Weekly Performance ─────────────────────────────────────── */}
       {weekly && (
         <div className="mb-4">
-          <Section icon={<TrendingUp size={12} />} label="Weekly Performance"
+          <Section icon={<TrendingUp size={12} />} label="Weekly Performance" id="sec-weekly"
             accent="#22c55e" tooltip="Real metrics from this week: credits earned per day, on-time rate, pace consistency, and focus hours."
             surfaceBg={surfaceBg} surfaceBorder={surfaceBorder} divider={divider} delay={0.05}
             right={
@@ -417,7 +508,7 @@ const InsightsPage: React.FC = () => {
         <div className="mb-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Completion bars */}
           <div className="lg:col-span-2">
-            <Section icon={<Layers size={12} />} label="Task Portfolio"
+            <Section icon={<Layers size={12} />} label="Task Portfolio" id="sec-portfolio"
               accent="#38bdf8" tooltip="Completion percentage for each active task, colored by pace status."
               surfaceBg={surfaceBg} surfaceBorder={surfaceBorder} divider={divider} delay={0.07}
               right={<span className="text-[10px] font-mono" style={{ color: 'var(--text-faint)' }}>{activeTasks.length} active · {completedTasks.length} done</span>}>
@@ -465,7 +556,7 @@ const InsightsPage: React.FC = () => {
           </div>
 
           {/* Status donut */}
-          <Section icon={<ListChecks size={12} />} label="Status Breakdown"
+          <Section icon={<ListChecks size={12} />} label="Status Breakdown" id="sec-status"
             accent="#a855f7" surfaceBg={surfaceBg} surfaceBorder={surfaceBorder} divider={divider} delay={0.08}>
             <div className="px-5 py-4">
               <div style={{ height: 160 }}>
@@ -512,7 +603,7 @@ const InsightsPage: React.FC = () => {
 
           {/* Habit Heatmap */}
           {habits.length > 0 && (
-            <Section icon={<Heart size={12} />} label="Habit Performance"
+            <Section icon={<Heart size={12} />} label="Habit Performance" id="sec-habits"
               accent="#f97316" tooltip="30-day completion heatmap for all tracked habits. Darker = completed."
               surfaceBg={surfaceBg} surfaceBorder={surfaceBorder} divider={divider} delay={0.1}
               right={<span className="text-[10px] font-mono" style={{ color: 'var(--text-faint)' }}>{habits.length} habit{habits.length !== 1 ? 's' : ''}</span>}>
@@ -568,7 +659,7 @@ const InsightsPage: React.FC = () => {
 
           {/* Goals Progress */}
           {goals.length > 0 && (
-            <Section icon={<Target size={12} />} label="Goal Progress"
+            <Section icon={<Target size={12} />} label="Goal Progress" id="sec-goals"
               accent="#a855f7" tooltip="Progress toward each active goal, with linked task counts."
               surfaceBg={surfaceBg} surfaceBorder={surfaceBorder} divider={divider} delay={0.11}
               right={<span className="text-[10px] font-mono" style={{ color: 'var(--text-faint)' }}>{goals.length} goal{goals.length !== 1 ? 's' : ''}</span>}>
@@ -621,7 +712,7 @@ const InsightsPage: React.FC = () => {
       {/* ── Row 5: Behavioral Drift Signals ──────────────────────────────── */}
       {drift && drift.driftScores.length > 0 && (
         <div className="mb-4">
-          <Section icon={<Brain size={12} />} label="Behavioral Drift Analysis"
+          <Section icon={<Brain size={12} />} label="Behavioral Drift Analysis" id="sec-drift"
             accent="#f97316"
             tooltip="Compares what you report vs what your behavior signals. Gap = over/under-reporting."
             surfaceBg={surfaceBg} surfaceBorder={surfaceBorder} divider={divider} delay={0.13}
@@ -794,7 +885,7 @@ const InsightsPage: React.FC = () => {
       {/* ── Row 10: Estimation Calibration ───────────────────────────────── */}
       {report && report.calibration.length > 0 && (
         <div className="mb-4">
-          <Section icon={<BarChart2 size={12} />} label="Estimation Calibration"
+          <Section icon={<BarChart2 size={12} />} label="Estimation Calibration" id="sec-calibration"
             accent="#38bdf8" tooltip="How accurate your time estimates are by task type, derived from pace consistency vs planned effort."
             surfaceBg={surfaceBg} surfaceBorder={surfaceBorder} divider={divider} delay={0.25}>
             <div className="px-5 py-2 overflow-x-auto">
@@ -832,6 +923,7 @@ const InsightsPage: React.FC = () => {
         </div>
       )}
 
+      </div>
     </div>
   );
 };
@@ -849,7 +941,7 @@ const VelocityDNACard: React.FC<{
   const radarData = dna.axes.map(a => ({ subject: a.axis, value: a.value, fullMark: 100 }));
   const axisColor = isDark ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.5)';
   return (
-    <Section icon={<Fingerprint size={12} />} label="Velocity DNA" accent="#a855f7"
+    <Section icon={<Fingerprint size={12} />} label="Velocity DNA" id="sec-dna" accent="#a855f7"
       tooltip="6-axis radar fingerprint derived from real task completions and check-in patterns — not a questionnaire."
       surfaceBg={surfaceBg} surfaceBorder={surfaceBorder} divider={divider} delay={0.02}
       right={<span className="text-[10px] font-mono px-2 py-0.5 rounded-full"
@@ -902,7 +994,7 @@ const GamificationCard: React.FC<{
 }> = ({ isDark, surfaceBg, surfaceBorder, divider, leaderboard }) => {
   const { profile } = useCredits();
   if (!profile) return (
-    <Section icon={<Trophy size={12} />} label="Velocity Credits" accent="#22c55e"
+    <Section icon={<Trophy size={12} />} label="Velocity Credits" id="sec-credits" accent="#22c55e"
       surfaceBg={surfaceBg} surfaceBorder={surfaceBorder} divider={divider} delay={0.04}>
       <div className="px-5 py-10 flex items-center justify-center">
         <span className="text-xs font-mono" style={{ color: 'var(--text-faint)' }}>Credits unavailable — backend offline</span>
@@ -922,7 +1014,7 @@ const GamificationCard: React.FC<{
   })();
 
   return (
-    <Section icon={<Trophy size={12} />} label="Velocity Credits" accent="#22c55e"
+    <Section icon={<Trophy size={12} />} label="Velocity Credits" id="sec-credits" accent="#22c55e"
       surfaceBg={surfaceBg} surfaceBorder={surfaceBorder} divider={divider} delay={0.04}
       right={<span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full"
         style={{ background: 'rgba(245,158,11,0.1)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.25)' }}>
@@ -1015,7 +1107,7 @@ const AchievementsCard: React.FC<{
   achievements: Achievement[]; unlocked: number; total: number;
   isDark: boolean; surfaceBg: string; surfaceBorder: string; divider: string;
 }> = ({ achievements, unlocked, total, isDark, surfaceBg, surfaceBorder, divider }) => (
-  <Section icon={<Medal size={12} />} label="Achievements" accent="#fbbf24"
+  <Section icon={<Medal size={12} />} label="Achievements" id="sec-achievements" accent="#fbbf24"
     surfaceBg={surfaceBg} surfaceBorder={surfaceBorder} divider={divider} delay={0.22}
     right={<span className="text-[10px] font-mono" style={{ color: 'var(--text-faint)' }}>{unlocked}/{total} unlocked</span>}>
     <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
@@ -1055,7 +1147,7 @@ const PrebriefCard: React.FC<{
   const start12 = `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${ap}`;
   const STATUS_ACCENT: Record<string, string> = { GREEN: '#22c55e', AMBER: '#f59e0b', RED: '#ef4444' };
   return (
-    <Section icon={<Sunrise size={12} />} label="Tomorrow Pre-Brief" accent="#38bdf8"
+    <Section icon={<Sunrise size={12} />} label="Tomorrow Pre-Brief" id="sec-prebrief" accent="#38bdf8"
       surfaceBg={surfaceBg} surfaceBorder={surfaceBorder} divider={divider} delay={0.2}
       right={
         <motion.button onClick={onRefresh} disabled={loading}
@@ -1147,7 +1239,7 @@ const ResultsCard: React.FC<{
   const actionBarData = breakdowns.filter(b => b.value > 0);
 
   return (
-    <Section icon={<Activity size={12} />} label="Impact Evidence" accent="#22c55e"
+    <Section icon={<Activity size={12} />} label="Impact Evidence" id="sec-impact" accent="#22c55e"
       tooltip="Real proof that AI assistance is working — every number is derived from actual agent log entries."
       surfaceBg={surfaceBg} surfaceBorder={surfaceBorder} divider={divider} delay={0.23}
       right={<span className="text-[10px] font-mono px-2 py-0.5 rounded-full"

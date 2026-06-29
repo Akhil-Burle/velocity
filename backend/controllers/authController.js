@@ -147,8 +147,9 @@ async function googleAuthInit(req, res) {
       'https://www.googleapis.com/auth/userinfo.email',
       'https://www.googleapis.com/auth/userinfo.profile',
       'https://www.googleapis.com/auth/calendar.readonly',
+      'https://www.googleapis.com/auth/calendar.events',
     ],
-    prompt: 'select_account',
+    prompt: 'consent',  // force consent so refresh token is always returned
   });
 
   return res.json({ authUrl });

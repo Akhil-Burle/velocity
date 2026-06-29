@@ -87,6 +87,7 @@ export const TOUR_HIGHLIGHTS: TourHighlight[] = [
     cardDesc: 'Plain-English commands → real actions, routed by AI',
     iconKey: 'zap',
     linkTo: '/dashboard',
+    cardOnly: true,
   },
   {
     id: 'panic-mode',

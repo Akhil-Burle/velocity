@@ -237,13 +237,13 @@ const TaskCard: React.FC<TaskCardProps> = ({
           )}
           {/* Card header */}
           <div className="flex items-start justify-between gap-2 mb-3 pr-8">
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 overflow-visible">
               <div className="flex items-center gap-2 mb-1">
                 <motion.span className={`w-1.5 h-1.5 rounded-full shrink-0`}
                   style={{ background: cfg.accent, boxShadow: `0 0 6px ${cfg.accent}` }}
                   animate={task.status === 'RED' ? { opacity: [1, 0.3, 1] } : { opacity: 1 }}
                   transition={{ duration: 0.9, repeat: Infinity }} />
-                <span className="font-semibold text-[14px] truncate tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                <span className="font-semibold leading-tight tracking-tight break-words" style={{ color: 'var(--text-primary)', fontSize: 'clamp(11px, 2.2vw, 14px)', wordBreak: 'break-word' }}>
                   {task.taskName}
                 </span>
               </div>

@@ -123,11 +123,11 @@ const VelocityVectorIndicator: React.FC<VelocityVectorProps> = ({
           <VectorArrow angle={angle} magnitude={magnitude} color={color} size={22} />
         </motion.div>
         <div className="hidden sm:flex flex-col items-start">
-          <span className="text-[9px] font-mono font-bold" style={{ color }}>
+          <span className="text-[10px] font-mono font-bold leading-tight" style={{ color }}>
             {label}
           </span>
           <div className="flex items-center gap-0.5">
-            <span className="text-[8px] font-mono" style={{ color: `${color}99` }}>
+            <span className="text-[9px] font-mono" style={{ color: `${color}cc` }}>
               {alignment}% aligned
             </span>
             <InfoTooltip

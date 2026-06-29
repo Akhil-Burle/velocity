@@ -271,7 +271,7 @@ const SettingsPage: React.FC = () => {
             </div>
             <div>
               <div className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Velocity</div>
-              <div className="text-[10px] font-mono" style={{ color: 'var(--text-faint)' }}>v2.0.0 · AI-powered productivity</div>
+              <div className="text-[10px] font-mono" style={{ color: 'var(--text-faint)' }}>AI-powered productivity</div>
             </div>
           </div>
           <span className="text-[10px] font-mono px-2 py-0.5 rounded-full"

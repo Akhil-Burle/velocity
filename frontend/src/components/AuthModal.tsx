@@ -62,21 +62,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }) => {
   };
 
   const handleGoogleSignIn = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`${BASE_URL}/auth/google`);
-      const data = await res.json();
-      if (data.authUrl) {
-        window.location.href = data.authUrl;
-      } else {
-        setError('Google Sign-In not available');
-        setLoading(false);
-      }
-    } catch (e: any) {
-      setError('Failed to initiate Google Sign-In');
-      setLoading(false);
-    }
+    setError(
+      'Google Sign-In requires app verification. Use Demo Login (demo / velocity2026) or Continue as Guest to explore all features.'
+    );
   };
 
   const handleGuest = async () => {

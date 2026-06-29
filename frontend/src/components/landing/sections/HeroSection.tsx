@@ -181,7 +181,7 @@ const AgentTerminal: React.FC<{ reducedMotion: boolean }> = ({ reducedMotion }) 
         <motion.div className="ml-auto w-1.5 h-1.5 rounded-full bg-green-400"
           animate={{ opacity: [1, 0.2, 1] }} transition={{ duration: 1.2, repeat: Infinity }} />
       </div>
-      <div className="px-4 py-3 space-y-1.5" style={{ minHeight: 140 }}>
+      <div className="px-4 py-3 space-y-1.5" style={{ minHeight: 180 }}>
         {visibleLines.map((lineIdx, i) => {
           const l = AGENT_LINES[lineIdx];
           return (
@@ -218,7 +218,7 @@ const FloatingMetric: React.FC<{
     animate={{ opacity: 1, scale: 1, y: 0 }}
     transition={{ delay, duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
     className="absolute hidden lg:flex flex-col gap-0.5 rounded-xl px-3 py-2.5"
-    style={{ left: x, top: y, background: isDark ? 'rgba(13,17,23,0.85)' : 'rgba(255,255,255,0.92)', border: `1px solid ${color}30`, backdropFilter: 'blur(16px)', boxShadow: isDark ? `0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px ${color}15` : `0 8px 28px -12px rgba(15,23,42,0.25), 0 0 0 1px ${color}15` }}
+    style={{ left: x, top: y, transform: 'translateY(-50%)', zIndex: 20, background: isDark ? 'rgba(13,17,23,0.85)' : 'rgba(255,255,255,0.92)', border: `1px solid ${color}30`, backdropFilter: 'blur(16px)', boxShadow: isDark ? `0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px ${color}15` : `0 8px 28px -12px rgba(15,23,42,0.25), 0 0 0 1px ${color}15` }}
   >
     {!reducedMotion && (
       <motion.div className="absolute inset-0 rounded-xl pointer-events-none"
@@ -310,25 +310,67 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onEnterDemo, onSeeHowItWorks,
 
       {/* Atmosphere */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
-        <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse 80% 60% at 50% -10%, rgba(34,197,94,${isDark ? 0.12 : 0.1}) 0%, transparent 70%)` }} />
-        <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse 60% 40% at 85% 70%, rgba(56,189,248,${isDark ? 0.06 : 0.07}) 0%, transparent 60%)` }} />
+        {/* Top green glow */}
+        <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse 80% 60% at 50% -10%, rgba(34,197,94,${isDark ? 0.18 : 0.1}) 0%, transparent 70%)` }} />
+        {/* Bottom-right blue glow */}
+        <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse 60% 40% at 85% 70%, rgba(56,189,248,${isDark ? 0.08 : 0.07}) 0%, transparent 60%)` }} />
+
+        {/* Mouse-tracking orb */}
         {!reducedMotion && (
           <motion.div className="absolute w-[600px] h-[600px] rounded-full pointer-events-none"
-            style={{ x: orbX, y: orbY, background: `radial-gradient(circle, rgba(34,197,94,${isDark ? 0.08 : 0.1}) 0%, transparent 70%)`, filter: 'blur(40px)' }} />
+            style={{ x: orbX, y: orbY, background: `radial-gradient(circle, rgba(34,197,94,${isDark ? 0.1 : 0.1}) 0%, transparent 70%)`, filter: 'blur(40px)' }} />
         )}
-        <div className="absolute inset-0" style={{ backgroundImage: `linear-gradient(${isDark ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.04)'} 1px, transparent 1px), linear-gradient(90deg, ${isDark ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.04)'} 1px, transparent 1px)`, backgroundSize: '64px 64px', maskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)', WebkitMaskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)' }} />
+
+        {/* Grid lines — more visible in dark mode */}
+        <div className="absolute inset-0" style={{
+          backgroundImage: `linear-gradient(${isDark ? 'rgba(34,197,94,0.07)' : 'rgba(15,23,42,0.04)'} 1px, transparent 1px), linear-gradient(90deg, ${isDark ? 'rgba(34,197,94,0.07)' : 'rgba(15,23,42,0.04)'} 1px, transparent 1px)`,
+          backgroundSize: '64px 64px',
+          maskImage: 'radial-gradient(ellipse 85% 85% at 50% 50%, black 30%, transparent 100%)',
+          WebkitMaskImage: 'radial-gradient(ellipse 85% 85% at 50% 50%, black 30%, transparent 100%)',
+        }} />
+
+        {/* Dark mode: animated green sweep across grid */}
+        {isDark && !reducedMotion && (
+          <motion.div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage: 'linear-gradient(180deg, transparent 0%, rgba(34,197,94,0.06) 50%, transparent 100%)',
+              backgroundSize: '100% 320px',
+            }}
+            animate={{ backgroundPositionY: ['0px', '100vh'] }}
+            transition={{ duration: 5, repeat: Infinity, ease: 'linear' }}
+          />
+        )}
+
+        {/* Dark mode: secondary horizontal shimmer on grid */}
+        {isDark && !reducedMotion && (
+          <motion.div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage: 'linear-gradient(90deg, transparent 0%, rgba(34,197,94,0.04) 50%, transparent 100%)',
+              backgroundSize: '320px 100%',
+            }}
+            animate={{ backgroundPositionX: ['-320px', '100vw'] }}
+            transition={{ duration: 8, repeat: Infinity, ease: 'linear', delay: 2 }}
+          />
+        )}
+
+        {/* Light mode: existing warm glow accent */}
+        {!isDark && (
+          <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 50% 40% at 50% 100%, rgba(34,197,94,0.05) 0%, transparent 70%)' }} />
+        )}
       </div>
 
       <ParticleCanvas reducedMotion={reducedMotion} isDark={isDark} />
 
-      {/* Floating metric cards */}
-      <FloatingMetric label="Drift Score" value="−23%" sub="Overreporting detected" color="#ef4444" delay={1.15} x="2%" y="30%" reducedMotion={reducedMotion} isDark={isDark} />
-      <FloatingMetric label="Velocity Vector" value="78%" sub="On vector · aligned" color="#22c55e" delay={1.35} x="1%" y="58%" reducedMotion={reducedMotion} isDark={isDark} />
-      <FloatingMetric label="Physics Curve" value="RED" sub="Steepening — intervene" color="#f59e0b" delay={1.55} x="80%" y="28%" reducedMotion={reducedMotion} isDark={isDark} />
-      <FloatingMetric label="Agent Actions" value="47" sub="Today · autonomous" color="#a78bfa" delay={1.75} x="78%" y="58%" reducedMotion={reducedMotion} isDark={isDark} />
+      {/* All four floating metric cards — absolute, anchored near section center */}
+      <FloatingMetric label="Drift Score"     value="−23%" sub="Overreporting detected"  color="#ef4444" delay={1.15} x="2%"  y="42%" reducedMotion={reducedMotion} isDark={isDark} />
+      <FloatingMetric label="Velocity Vector" value="78%"  sub="On vector · aligned"      color="#22c55e" delay={1.35} x="2%"  y="60%" reducedMotion={reducedMotion} isDark={isDark} />
+      <FloatingMetric label="Physics Curve"   value="RED"  sub="Steepening — intervene"   color="#f59e0b" delay={1.55} x="75%" y="30%" reducedMotion={reducedMotion} isDark={isDark} />
+      <FloatingMetric label="Agent Actions"   value="47"   sub="Today · autonomous"       color="#a78bfa" delay={1.75} x="75%" y="65%" reducedMotion={reducedMotion} isDark={isDark} />
 
       {/* Main content */}
-      <div className="relative z-10 w-full max-w-6xl mx-auto px-5 sm:px-8 pt-24 pb-16 grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8 lg:gap-10 items-center">
+      <div className="relative z-10 w-full max-w-6xl mx-auto px-5 sm:px-8 pt-24 pb-16 grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8 lg:gap-12 items-center">
         <div className="flex flex-col gap-5">
           {/* Badge */}
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: e }}>
@@ -359,7 +401,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onEnterDemo, onSeeHowItWorks,
             </span>
           </motion.p>
 
-          {/* Capability rail — fills the space the task bar used to occupy */}
+          {/* Capability rail */}
           <CapabilityRail reducedMotion={reducedMotion} isDark={isDark} />
 
           {/* CTAs */}
@@ -401,8 +443,9 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onEnterDemo, onSeeHowItWorks,
           </motion.div>
         </div>
 
-        {/* Right: Agent terminal */}
-        <motion.div initial={{ opacity: 0, x: 32, scale: 0.95 }} animate={{ opacity: 1, x: 0, scale: 1 }}
+        {/* Right: Agent terminal — centered in its column */}
+        <motion.div
+          initial={{ opacity: 0, x: 32, scale: 0.95 }} animate={{ opacity: 1, x: 0, scale: 1 }}
           transition={{ duration: 0.9, delay: 0.5, ease: e }}>
           <AgentTerminal reducedMotion={reducedMotion} />
         </motion.div>

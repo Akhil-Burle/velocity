@@ -49,6 +49,7 @@ const StartHereCard: React.FC<StartHereCardProps> = ({ onTriggerPanic }) => {
   const navigate = useNavigate();
   const { cardVisible, dismissCard, seenIds, seenCount, totalCount, markSeen } = useTour();
   const [mounted, setMounted] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   // Small delay before revealing so dashboard renders first
   useEffect(() => {
@@ -97,8 +98,11 @@ const StartHereCard: React.FC<StartHereCardProps> = ({ onTriggerPanic }) => {
               border: '1px solid rgba(34,197,94,0.2)',
             }}
           >
-            {/* ── Header ─────────────────────────────────────────────────── */}
-            <div className="flex items-center justify-between px-4 pt-3.5 pb-2">
+          {/* ── Header ─────────────────────────────────────────────────── */}
+            <div
+              className="flex items-center justify-between px-4 pt-3.5 pb-3 cursor-pointer select-none"
+              onClick={() => setExpanded(v => !v)}
+            >
               <div className="flex items-center gap-2.5">
                 <motion.div
                   className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
@@ -113,13 +117,13 @@ const StartHereCard: React.FC<StartHereCardProps> = ({ onTriggerPanic }) => {
                     Start here for judges
                   </span>
                   <span className="text-[10px] font-mono ml-2" style={{ color: 'var(--text-faint)' }}>
-                    8 things that make this an agent, not a scheduler
+                    {expanded ? '8 things that make this an agent, not a scheduler' : `${seenCount}/${totalCount} explored · click to expand`}
                   </span>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                {/* Progress indicator — understated breadcrumb */}
+                {/* Progress indicator */}
                 <div
                   className="flex items-center gap-1.5 px-2 py-0.5 rounded-full"
                   style={{
@@ -143,8 +147,18 @@ const StartHereCard: React.FC<StartHereCardProps> = ({ onTriggerPanic }) => {
                   </span>
                 </div>
 
+                {/* Expand/collapse chevron */}
+                <motion.div
+                  animate={{ rotate: expanded ? 180 : 0 }}
+                  transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                  className="w-5 h-5 flex items-center justify-center"
+                  style={{ color: 'var(--text-faint)' }}
+                >
+                  <ChevronRight size={12} style={{ transform: 'rotate(90deg)' }} />
+                </motion.div>
+
                 <motion.button
-                  onClick={dismissCard}
+                  onClick={e => { e.stopPropagation(); dismissCard(); }}
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
                   className="w-6 h-6 flex items-center justify-center rounded-full"
@@ -156,66 +170,78 @@ const StartHereCard: React.FC<StartHereCardProps> = ({ onTriggerPanic }) => {
               </div>
             </div>
 
-            {/* ── Links grid — 2 cols on mobile, 4 cols on desktop ─────── */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-4 pb-3">
-              {TOUR_HIGHLIGHTS.map((h, i) => {
-                const isSeen = seenIds.has(h.id);
-                return (
-                  <motion.button
-                    key={h.id}
-                    onClick={() => handleLinkClick(h.id, h.linkTo, h.deepLinkKey, h.deepLinkValue)}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.06 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
-                    whileHover={{ scale: 1.03, y: -2 }}
-                    whileTap={{ scale: 0.97 }}
-                    className="flex flex-col items-start gap-1.5 p-3 rounded-xl text-left relative overflow-hidden"
-                    style={{
-                      background: isSeen
-                        ? (isDark ? 'rgba(34,197,94,0.05)' : 'rgba(34,197,94,0.04)')
-                        : `${h.color}0d`,
-                      border: isSeen
-                        ? '1px solid rgba(34,197,94,0.2)'
-                        : `1px solid ${h.color}22`,
-                      opacity: isSeen ? 0.75 : 1,
-                    }}
-                  >
-                    {/* Seen check overlay */}
-                    {isSeen && (
-                      <motion.div
-                        initial={{ scale: 0, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="absolute top-2 right-2"
-                      >
-                        <CheckCircle2 size={11} style={{ color: '#22c55e' }} />
-                      </motion.div>
-                    )}
+            {/* ── Expandable body ─────────────────────────────────────── */}
+            <AnimatePresence initial={false}>
+              {expanded && (
+                <motion.div
+                  key="body"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                  className="overflow-hidden"
+                >
+                  {/* ── Links grid — 2 cols on mobile, 4 cols on desktop ─────── */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-4 pb-3">
+                    {TOUR_HIGHLIGHTS.map((h, i) => {
+                      const isSeen = seenIds.has(h.id);
+                      return (
+                        <motion.button
+                          key={h.id}
+                          onClick={() => handleLinkClick(h.id, h.linkTo, h.deepLinkKey, h.deepLinkValue)}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.06 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
+                          whileHover={{ scale: 1.03, y: -2 }}
+                          whileTap={{ scale: 0.97 }}
+                          className="flex flex-col items-start gap-1.5 p-3 rounded-xl text-left relative overflow-hidden"
+                          style={{
+                            background: isSeen
+                              ? (isDark ? 'rgba(34,197,94,0.05)' : 'rgba(34,197,94,0.04)')
+                              : `${h.color}0d`,
+                            border: isSeen
+                              ? '1px solid rgba(34,197,94,0.2)'
+                              : `1px solid ${h.color}22`,
+                            opacity: isSeen ? 0.75 : 1,
+                          }}
+                        >
+                          {isSeen && (
+                            <motion.div
+                              initial={{ scale: 0, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              className="absolute top-2 right-2"
+                            >
+                              <CheckCircle2 size={11} style={{ color: '#22c55e' }} />
+                            </motion.div>
+                          )}
+                          <div className="flex items-center justify-between w-full">
+                            <span style={{ color: isSeen ? '#22c55e' : h.color }}>
+                              {ICON_MAP[h.iconKey] || <Zap size={12} />}
+                            </span>
+                            {!isSeen && <ChevronRight size={10} style={{ color: `${h.color}55` }} />}
+                          </div>
+                          <div>
+                            <div className="text-[11px] font-semibold leading-snug" style={{ color: 'var(--text-primary)' }}>
+                              {h.title}
+                            </div>
+                            <div className="text-[9.5px] font-mono mt-0.5 leading-snug" style={{ color: 'var(--text-faint)' }}>
+                              {h.cardDesc}
+                            </div>
+                          </div>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
 
-                    <div className="flex items-center justify-between w-full">
-                      <span style={{ color: isSeen ? '#22c55e' : h.color }}>
-                        {ICON_MAP[h.iconKey] || <Zap size={12} />}
-                      </span>
-                      {!isSeen && <ChevronRight size={10} style={{ color: `${h.color}55` }} />}
-                    </div>
-                    <div>
-                      <div className="text-[11px] font-semibold leading-snug" style={{ color: 'var(--text-primary)' }}>
-                        {h.title}
-                      </div>
-                      <div className="text-[9.5px] font-mono mt-0.5 leading-snug" style={{ color: 'var(--text-faint)' }}>
-                        {h.cardDesc}
-                      </div>
-                    </div>
-                  </motion.button>
-                );
-              })}
-            </div>
-
-            {/* ── Footer tip ─────────────────────────────────────────────── */}
-            <div className="px-4 pb-3">
-              <p className="text-[9.5px] font-mono" style={{ color: 'var(--text-faint)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8 }}>
-                Hints appear automatically as you navigate. Dismiss this card and use the Tour button in the header to re-open it.
-              </p>
-            </div>
+                  {/* ── Footer tip ─────────────────────────────────────────────── */}
+                  <div className="px-4 pb-3">
+                    <p className="text-[9.5px] font-mono" style={{ color: 'var(--text-faint)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8 }}>
+                      Hints appear automatically as you navigate. Dismiss this card and use the Tour button in the header to re-open it.
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </motion.div>
       )}

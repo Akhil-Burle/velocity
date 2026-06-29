@@ -21,7 +21,7 @@ const ProblemBlock: React.FC<{ reducedMotion: boolean }> = ({ reducedMotion }) =
           <Eyebrow color="#ef4444">The problem with every other tool</Eyebrow>
           <h2 style={{ fontSize: 'clamp(2rem, 5vw, 3.8rem)', fontWeight: 800, letterSpacing: '-0.035em', lineHeight: 1.08, color: p.text }}>
             A speedometer shows you how fast.<br />
-            <span style={{ color: p.textDim }}>It can't tell you if you're headed off a cliff.</span>
+            <span style={{ color: p.textDim }}>It can't tell you if you're <span style={{ color: p.text }}>headed</span> off a cliff.</span>
           </h2>
         </Reveal>
 

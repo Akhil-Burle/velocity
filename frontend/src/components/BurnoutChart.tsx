@@ -3,7 +3,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Burnout Horizon — compact collapsible widget.
  * Collapsed: single status row (urgent alert if burning today).
- * Expanded:  full 14-day area chart.
+ * Expanded:  full 7-day area chart.
  */
 import React, { useMemo, useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -34,7 +34,7 @@ function buildBurnoutData(tasks: Task[]): BurnoutDataPoint[] {
   const now = Date.now();
   const HOURS_PER_DAY = 8;
 
-  return Array.from({ length: 14 }, (_, idx) => {
+  return Array.from({ length: 7 }, (_, idx) => {
     const dayMs = now + idx * 86400000;
     const dayLabel = idx === 0 ? 'Today' : idx === 1 ? 'Tmrw' :
       new Date(dayMs).toLocaleDateString('en', { weekday: 'short', month: 'numeric', day: 'numeric' }).replace(',', '');
@@ -121,7 +121,7 @@ const BurnoutChart: React.FC<BurnoutChartProps> = ({ tasks, isDark = true, onTri
             style={{ color: isBurningToday ? '#f87171' : 'var(--text-faint)' }}>
             Burnout Horizon
           </span>
-          <InfoTooltip explanation="14-day workload forecast — compares hours your active tasks require each day against your 8h/day capacity limit." />
+          <InfoTooltip explanation="7-day workload forecast — compares hours your active tasks require each day against your 8h/day capacity limit." />
           {isBurningToday ? (
             <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full"
               style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.22)' }}>
@@ -131,7 +131,7 @@ const BurnoutChart: React.FC<BurnoutChartProps> = ({ tasks, isDark = true, onTri
           ) : (
             <span className="text-[10px] font-mono px-2 py-0.5 rounded-full"
               style={{ background: 'rgba(34,197,94,0.08)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.18)' }}>
-              capacity OK · 14-day horizon clear
+              capacity OK · 7-day horizon clear
             </span>
           )}
         </div>
@@ -188,7 +188,7 @@ const BurnoutChart: React.FC<BurnoutChartProps> = ({ tasks, isDark = true, onTri
                   <CartesianGrid horizontal vertical={false} stroke={gridColor} />
                   <XAxis dataKey="day"
                     tick={{ fill: 'var(--text-faint)', fontSize: 9, fontFamily: 'JetBrains Mono, monospace' }}
-                    tickLine={false} axisLine={false} interval={1} />
+                    tickLine={false} axisLine={false} interval={0} />
                   {burnoutRegions.map((r, i) => (
                     <ReferenceArea key={i} x1={r.x1} x2={r.x2} fill="rgba(239,68,68,0.06)" strokeWidth={0} />
                   ))}

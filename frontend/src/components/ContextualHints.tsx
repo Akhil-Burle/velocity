@@ -246,7 +246,7 @@ const HintBubble: React.FC<{
       }}
       initial={{ opacity: 0, scale: 0.93 }}
       animate={{ opacity: pos ? 1 : 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.13 } }}
+      exit={{ opacity: 0, scale: 0.96, transition: { duration: 1.4, ease: 'easeInOut' } }}
       transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
     >
       {/* Bubble — position:relative so Arrow SVGs anchor correctly */}
@@ -318,7 +318,7 @@ const ContextualHints: React.FC = () => {
     if (dismissTimer.current) clearTimeout(dismissTimer.current);
     markSeen(id);
     setShowBubble(false);
-    setTimeout(() => { setActive(null); setTargetRect(null); }, 220);
+    setTimeout(() => { setActive(null); setTargetRect(null); }, 1600); // wait for slow fade
   }, [markSeen]);
 
   useEffect(() => {
@@ -339,7 +339,7 @@ const ContextualHints: React.FC = () => {
         const r = measureTarget(chosen.target);
         if (r) {
           setActive(chosen); setTargetRect(r); setShowBubble(true);
-          dismissTimer.current = setTimeout(() => dismiss(chosen.id), 12000);
+          dismissTimer.current = setTimeout(() => dismiss(chosen.id), 6000);
         } else if (tries++ < 15) { setTimeout(probe, 200); }
       };
       probe();

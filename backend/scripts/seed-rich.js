@@ -7,10 +7,10 @@
  * Safe to re-run anytime — full wipe + reseed on every run.
  *
  * What a judge sees on demo login:
- *   Dashboard  : 9 active tasks (2 RED / 4 AMBER / 3 GREEN), 3 rescheduled,
- *                5 completed, burnout chart showing real struggle, velocity score showing
- *                real pressure, Panic Mode + Negotiate buttons visible, Ultimatum
- *                trigger seeded.
+ *   Dashboard  : 13 active tasks (2 RED / 2 AMBER / 9 GREEN), 3 rescheduled,
+ *                5 completed. Burnout chart: ~8.5h required today (just over 8h
+ *                cap), dropping to clear by day 4. Panic Mode + Negotiate
+ *                buttons visible, Ultimatum trigger seeded.
  *   Agent Log  : 40+ entries spanning 14 days of history (chains, policy, drift,
  *                omnibar, rebalance, panic, negotiate, triage, ultimatum)
  *   Insights   : 47 check-ins across 8 tasks → all 6 DNA axes populated with 14 days
@@ -83,26 +83,26 @@ function sparklineStale(baseVal = 50, daysBack = 3) {
 }
 
 
-// ═════════════════════════════════════════════════════════════════════════════
-// TASKS — 9 active + 3 rescheduled + 5 completed = 17 total
+// ── TASKS — 13 active + 3 rescheduled + 5 completed = 21 total
 // Narrative: CS senior, capstone sprint, two internship pipelines in flight,
-//            OS assignment in full crisis, ML paper overdue, TA shift owed to
-//            a professor, distributed systems lab, hackathon project.
-// ═════════════════════════════════════════════════════════════════════════════
+//            OS assignment in crisis (RED), capstone WebSocket behind (RED),
+//            Meta write-up (AMBER), REST API endpoints (AMBER),
+//            everything else comfortably GREEN.
+// Day-0 burnout total: ~8.6h — just over the 8h cap for a realistic alert.
 function buildTasks(userId) {
   const tasks = [];
   const ids = {};
 
-  // ── T1 · RED · CODE · 28h · PANIC eligible ───────────────────────────────
+  // ── T1 · RED · CODE · 3 days · PANIC eligible ────────────────────────────
   ids.t1 = uuidv4();
   tasks.push({
     userId, id: ids.t1,
     taskName: 'OS Assignment 4 — Virtual Memory Simulator',
-    deadline: hoursFromNow(28), taskType: 'CODE', cognitiveWeight: 'HIGH',
+    deadline: daysFromNow(2.5), taskType: 'CODE', cognitiveWeight: 'HIGH',
     selfOwned: true, recipientName: null,
-    currentPaceHoursPerDay: calcPace('HIGH', hoursFromNow(28)), status: 'RED',
+    currentPaceHoursPerDay: 3.2, status: 'RED',
     energyLevel: 'Deep Focus', estimatedDuration: 120,
-    driftExplanation: 'Only 8% done with ~28 hours left. Clock-replacement policy implementation still missing. You need ~4h of focused work today. Panic Mode will generate a working C scaffold.',
+    driftExplanation: 'Only 8% done with 2.5 days left. Clock-replacement policy implementation still missing. You need ~2h of focused work today. Panic Mode will generate a working C scaffold.',
     hotStartContent: '', negotiatedDraft: '',
     completionPercent: 8, sparkline: sparkline('crash', 80), isRescheduled: false,
     rawInput: 'OS assignment 4 virtual memory simulator due tomorrow 8am',
@@ -119,16 +119,16 @@ function buildTasks(userId) {
     mode: 'normal', createdAt: daysAgo(3), updatedAt: hoursAgo(2),
   });
 
-  // ── T2 · AMBER · WRITING · 2.5 days · Negotiate eligible (Recruiting Team) ─
+  // ── T2 · AMBER · WRITING · 4 days · Negotiate eligible (Recruiting Team) ──
   ids.t2 = uuidv4();
   tasks.push({
     userId, id: ids.t2,
     taskName: 'Systems Design Interview Write-up — Meta Internship',
-    deadline: daysFromNow(2.5), taskType: 'WRITING', cognitiveWeight: 'HIGH',
+    deadline: daysFromNow(3.5), taskType: 'WRITING', cognitiveWeight: 'HIGH',
     selfOwned: false, recipientName: 'Recruiting Team',
-    currentPaceHoursPerDay: calcPace('HIGH', daysFromNow(2.5)), status: 'AMBER',
+    currentPaceHoursPerDay: 2.4, status: 'AMBER',
     energyLevel: 'Deep Focus', estimatedDuration: 90,
-    driftExplanation: '22% complete with 2.5 days left. Three design answers still pending — about 1.5–2h of focused writing per day will get you there. Negotiate button ready if schedule tightens.',
+    driftExplanation: '22% complete with 3.5 days left. Three design answers still pending — about 1.4h of focused writing per day will get you there. Negotiate button ready if schedule tightens.',
     hotStartContent: '', negotiatedDraft: '',
     completionPercent: 22, sparkline: sparkline('zigzag', 52), isRescheduled: false,
     rawInput: 'Meta internship systems design take-home due in 2 days',
@@ -143,18 +143,18 @@ function buildTasks(userId) {
     mode: 'normal', createdAt: daysAgo(4), updatedAt: hoursAgo(3),
   });
 
-  // ── T3 · RED · CODE · 2 days · Ultimatum pair A (trust gap demo) ──────────
+  // ── T3 · AMBER · CODE · 3 days · Ultimatum pair A (trust gap demo) ─────────
   ids.t3 = uuidv4();
   tasks.push({
     userId, id: ids.t3,
     taskName: 'Capstone: Real-time Collaboration Module (WebSocket)',
-    deadline: daysFromNow(2), taskType: 'CODE', cognitiveWeight: 'HIGH',
+    deadline: daysFromNow(2.5), taskType: 'CODE', cognitiveWeight: 'HIGH',
     selfOwned: true, recipientName: null,
-    currentPaceHoursPerDay: calcPace('HIGH', daysFromNow(2)), status: 'RED',
+    currentPaceHoursPerDay: 2.8, status: 'AMBER',
     energyLevel: 'Deep Focus', estimatedDuration: 150,
-    driftExplanation: '34% complete — behind by 3 days of expected progress. AI detected a 26% trust gap: you reported 60% last check-in but subtask completion shows 34%. WebSocket server crashes under concurrent load. Fix race condition immediately.',
+    driftExplanation: '35% complete — behind schedule but still recoverable. WebSocket race condition fixed; CRDT skeleton drafted. About 2.2h/day for the next 2.5 days will close the gap before the sprint demo. Do not slip further.',
     hotStartContent: '', negotiatedDraft: '',
-    completionPercent: 34, sparkline: sparkline('crash', 70), isRescheduled: false,
+    completionPercent: 35, sparkline: sparkline('zigzag', 45), isRescheduled: false,
     rawInput: 'Capstone project real-time collaboration module due in 2 days for sprint demo',
     creditValue: 350, creditsAwarded: false,
     subtasks: [
@@ -181,19 +181,19 @@ function buildTasks(userId) {
     mode: 'normal', createdAt: daysAgo(10), updatedAt: hoursAgo(1),
   });
 
-  // ── T4 · AMBER · OTHER · 3 days · Prof. Chen / Negotiate eligible ─────────
+  // ── T4 · GREEN · OTHER · 5 days · Prof. Chen / Negotiate eligible ──────────
   ids.t4 = uuidv4();
   tasks.push({
     userId, id: ids.t4,
     taskName: 'Grading Rubric + 38 Student Submissions — TA Shift',
-    deadline: daysFromNow(3), taskType: 'OTHER', cognitiveWeight: 'MEDIUM',
+    deadline: daysFromNow(5), taskType: 'OTHER', cognitiveWeight: 'MEDIUM',
     selfOwned: false, recipientName: 'Prof. Chen',
-    currentPaceHoursPerDay: calcPace('MEDIUM', daysFromNow(3)), status: 'AMBER',
+    currentPaceHoursPerDay: 1.2, status: 'GREEN',
     energyLevel: 'Quick Wins', estimatedDuration: 90,
-    driftExplanation: '30% complete (12/38 graded). Average 7 min per submission, 26 remaining = ~3h. At current pace you miss Prof. Chen\'s Friday 5 PM cutoff by ~4h. A Saturday noon extension request is ready to send.',
+    driftExplanation: '30% complete (12/38 graded). Average 7 min per submission, 26 remaining = ~3h across 5 days — totally manageable at ~40 min/day. On track for Prof. Chen\'s deadline.',
     hotStartContent: '',
     negotiatedDraft: `Dear Prof. Chen,\n\nI am writing regarding my TA grading shift for Assignment 3. I have completed 12 of 38 submissions and am making steady progress, but given my current sprint workload I anticipate completing the remaining 26 by Saturday noon rather than Friday 5 PM.\n\nWould a Saturday noon submission be acceptable? I will ensure all grades include detailed rubric-based feedback as agreed.\n\nThank you for your understanding.\n\nBest,\nAlex`,
-    completionPercent: 30, sparkline: sparkline('zigzag', 55), isRescheduled: false,
+    completionPercent: 30, sparkline: sparkline('up', 22), isRescheduled: false,
     rawInput: 'TA grading 38 submissions for Prof Chen due Friday 5pm',
     creditValue: 140, creditsAwarded: false,
     subtasks: [
@@ -205,24 +205,24 @@ function buildTasks(userId) {
     mode: 'normal', createdAt: daysAgo(5), updatedAt: hoursAgo(4),
   });
 
-  // ── T5 · AMBER · CODE · 5 days · Ultimatum pair B ────────────────────────
+  // ── T5 · GREEN · CODE · 6 days · on track ───────────────────────────────
   ids.t5 = uuidv4();
   tasks.push({
     userId, id: ids.t5,
     taskName: 'Distributed Systems — Raft Consensus Implementation',
-    deadline: daysFromNow(5), taskType: 'CODE', cognitiveWeight: 'HIGH',
+    deadline: daysFromNow(6), taskType: 'CODE', cognitiveWeight: 'MEDIUM',
     selfOwned: true, recipientName: null,
-    currentPaceHoursPerDay: calcPace('HIGH', daysFromNow(5)), status: 'AMBER',
+    currentPaceHoursPerDay: 1.4, status: 'GREEN',
     energyLevel: 'Deep Focus', estimatedDuration: 120,
-    driftExplanation: '48% complete. Log replication works. Leader election has a split-brain edge case under network partition. Need ~8h more — will make it but barely.',
+    driftExplanation: '50% complete with 6 days remaining — on track. Log replication and split-brain fix both done. ~30 min/day keeps you ahead of the deadline.',
     hotStartContent: '', negotiatedDraft: '',
-    completionPercent: 48, sparkline: sparkline('flat', 58), isRescheduled: false,
+    completionPercent: 50, sparkline: sparkline('flat', 58), isRescheduled: false,
     rawInput: 'Distributed systems Raft implementation lab 3 due in 5 days',
     creditValue: 260, creditsAwarded: false,
     subtasks: [
       sub('Implement leader election (RequestVote RPC)', 90, true),
       sub('Implement log replication (AppendEntries RPC)', 90, true),
-      sub('Fix split-brain under network partition', 75, false),
+      sub('Fix split-brain under network partition', 75, true),
       sub('Implement log compaction + snapshotting', 60, false),
       sub('Pass all 30 provided test cases', 45, false),
       sub('Write design doc (1 page)', 30, false),
@@ -231,30 +231,30 @@ function buildTasks(userId) {
   });
 
 
-  // ── T6 · AMBER · WRITING · 6 days · stale sparkline / trust decay demo ────
+  // ── T6 · RED · WRITING · 7 days · stale sparkline / trust decay demo ────
   ids.t6 = uuidv4();
   tasks.push({
     userId, id: ids.t6,
     taskName: 'ML Research Paper — Contrastive Learning for Low-Resource NLP',
-    deadline: daysFromNow(6), taskType: 'WRITING', cognitiveWeight: 'HIGH',
+    deadline: daysFromNow(7), taskType: 'WRITING', cognitiveWeight: 'HIGH',
     selfOwned: true, recipientName: null,
-    currentPaceHoursPerDay: calcPace('HIGH', daysFromNow(6)), status: 'AMBER',
+    currentPaceHoursPerDay: 4.8, status: 'RED',
     energyLevel: 'Deep Focus', estimatedDuration: 90,
-    driftExplanation: 'Self-reported 55% vs 41% actual (3/7 sections done). 14% trust gap detected — last check-in was 3 days ago. Trust Decay is actively draining displayed progress. Recalibrate: results section is incomplete, not just "in progress."',
+    driftExplanation: 'Only 18% done with 7 days left — severely behind. Required rate is 4.8h/day. Results section, ablation experiments, and discussion are all untouched. Last check-in was 3 days ago. Trust Decay has flagged a 38% gap between self-reported and actual progress. Activate Panic Mode or negotiate a deadline extension immediately.',
     hotStartContent: '', negotiatedDraft: '',
-    completionPercent: 55, sparkline: sparklineStale(52, 3), isRescheduled: false,
+    completionPercent: 18, sparkline: sparkline('crash', 60), isRescheduled: false,
     rawInput: 'ML paper on contrastive learning for NLP conference submission in 6 days',
     creditValue: 220, creditsAwarded: false,
     subtasks: [
       sub('Write abstract + introduction (1.5 pages)', 60, true),
-      sub('Background / related work section (2 pages)', 90, true),
-      sub('Methodology: model architecture and training', 90, true),
+      sub('Background / related work section (2 pages)', 90, false),
+      sub('Methodology: model architecture and training', 90, false),
       sub('Experiments: baselines, ablations, error analysis', 120, false),
       sub('Results section with tables and figures', 90, false),
       sub('Discussion, limitations, conclusion', 60, false),
       sub('Format citations and camera-ready polish', 45, false),
     ],
-    mode: 'amber', createdAt: daysAgo(14), updatedAt: hoursAgo(3),
+    mode: 'normal', createdAt: daysAgo(14), updatedAt: hoursAgo(3),
   });
 
   // ── T7 · GREEN · CODE · 8 days ────────────────────────────────────────────
@@ -264,7 +264,7 @@ function buildTasks(userId) {
     taskName: 'Hackathon Submission — AI Study Planner (Google Gemini)',
     deadline: daysFromNow(8), taskType: 'CODE', cognitiveWeight: 'MEDIUM',
     selfOwned: true, recipientName: null,
-    currentPaceHoursPerDay: calcPace('MEDIUM', daysFromNow(8)), status: 'GREEN',
+    currentPaceHoursPerDay: 1.1, status: 'GREEN',
     energyLevel: 'Quick Wins', estimatedDuration: 75,
     driftExplanation: '71% complete and on track. Core Gemini integration works, UI is polished. Final stretch: demo video and submission form.',
     hotStartContent: '', negotiatedDraft: '',
@@ -282,14 +282,14 @@ function buildTasks(userId) {
     mode: 'normal', createdAt: daysAgo(12), updatedAt: hoursAgo(1),
   });
 
-  // ── T8 · GREEN · CODE · 10 days ───────────────────────────────────────────
+  // ── T8 · GREEN · CODE · 6 days ────────────────────────────────────────────
   ids.t8 = uuidv4();
   tasks.push({
     userId, id: ids.t8,
     taskName: 'Senior Portfolio Site — New Projects Section',
-    deadline: daysFromNow(10), taskType: 'CODE', cognitiveWeight: 'LOW',
+    deadline: daysFromNow(6), taskType: 'CODE', cognitiveWeight: 'LOW',
     selfOwned: true, recipientName: null,
-    currentPaceHoursPerDay: calcPace('LOW', daysFromNow(10)), status: 'GREEN',
+    currentPaceHoursPerDay: 0.8, status: 'GREEN',
     energyLevel: 'Quick Wins', estimatedDuration: 45,
     driftExplanation: '80% complete. Only needs the capstone project card and deployment. Will finish in 1–2 sessions.',
     hotStartContent: '', negotiatedDraft: '',
@@ -300,33 +300,109 @@ function buildTasks(userId) {
       sub('Add capstone project card with screenshots', 30, true),
       sub('Add Raft implementation to projects', 20, true),
       sub('Write "About" section update', 25, true),
-      sub('Add Velocity hackathon project', 20, false),
+      sub('Add Velocity hackathon project', 20, true),
       sub('Deploy to Vercel, check all links', 15, false),
     ],
     mode: 'normal', createdAt: daysAgo(20), updatedAt: daysAgo(2),
   });
 
-  // ── T9 · GREEN · DIAGRAM · 12 days ───────────────────────────────────────
+  // ── T9 · GREEN · DIAGRAM · 7 days ────────────────────────────────────────
   ids.t9 = uuidv4();
   tasks.push({
     userId, id: ids.t9,
     taskName: 'Architecture Diagram — Capstone Final Report',
-    deadline: daysFromNow(12), taskType: 'DIAGRAM', cognitiveWeight: 'LOW',
+    deadline: daysFromNow(7), taskType: 'DIAGRAM', cognitiveWeight: 'LOW',
     selfOwned: true, recipientName: null,
-    currentPaceHoursPerDay: calcPace('LOW', daysFromNow(12)), status: 'GREEN',
+    currentPaceHoursPerDay: 0.7, status: 'GREEN',
     energyLevel: 'Brain-Dead', estimatedDuration: 30,
-    driftExplanation: '55% complete. Block diagram for system overview done. Sequence diagrams for WebSocket and REST flows still needed.',
+    driftExplanation: '50% complete. Block diagram for system overview done, WebSocket sequence drafted. REST API flow and ERD still needed.',
     hotStartContent: '', negotiatedDraft: '',
-    completionPercent: 55, sparkline: sparkline('flat', 50), isRescheduled: false,
-    rawInput: 'Architecture diagrams for capstone final report due in 12 days',
+    completionPercent: 50, sparkline: sparkline('flat', 50), isRescheduled: false,
+    rawInput: 'Architecture diagrams for capstone final report due in 7 days',
     creditValue: 70, creditsAwarded: false,
     subtasks: [
       sub('System overview block diagram', 45, true),
-      sub('WebSocket flow sequence diagram', 30, false),
+      sub('WebSocket flow sequence diagram', 30, true),
       sub('REST API flow sequence diagram', 30, false),
       sub('Database schema ERD', 30, false),
     ],
     mode: 'normal', createdAt: daysAgo(7), updatedAt: daysAgo(1),
+  });
+
+  // ── T18 · GREEN · OTHER · 6 days · Internship recruiter screen prep ────────
+  ids.t18 = uuidv4();
+  tasks.push({
+    userId, id: ids.t18,
+    taskName: 'Stripe Technical Phone Screen — Interview Prep',
+    deadline: daysFromNow(6), taskType: 'OTHER', cognitiveWeight: 'MEDIUM',
+    selfOwned: true, recipientName: null,
+    currentPaceHoursPerDay: 1.3, status: 'GREEN',
+    energyLevel: 'Deep Focus', estimatedDuration: 90,
+    driftExplanation: '25% prepared with 6 days until screen — well-paced. Need to cover system design fundamentals (distributed payments, idempotency, API design) and complete 4 mock coding rounds. ~30 min/day keeps you on track.',
+    hotStartContent: '', negotiatedDraft: '',
+    completionPercent: 25, sparkline: sparkline('up', 30), isRescheduled: false,
+    rawInput: 'Prepare for Stripe technical phone screen in 4 days',
+    creditValue: 200, creditsAwarded: false,
+    subtasks: [
+      sub('Review distributed payments system design', 60, true),
+      sub('Study idempotency keys and at-least-once delivery', 45, false),
+      sub('2× mock coding rounds (LeetCode medium)', 60, false),
+      sub('Review Stripe API design patterns', 45, false),
+      sub('Prepare 3 STAR-format behavioural answers', 45, false),
+      sub('Final mock technical round + debrief', 60, false),
+    ],
+    mode: 'normal', createdAt: daysAgo(2), updatedAt: hoursAgo(5),
+  });
+
+  // ── T19 · GREEN · WRITING · 6 days · Google recruiter follow-up ─────────
+  ids.t19 = uuidv4();
+  tasks.push({
+    userId, id: ids.t19,
+    taskName: 'Google STEP Internship — Cover Letter & Application',
+    deadline: daysFromNow(6), taskType: 'WRITING', cognitiveWeight: 'MEDIUM',
+    selfOwned: false, recipientName: 'Recruiting Team',
+    currentPaceHoursPerDay: 1.0, status: 'GREEN',
+    energyLevel: 'Quick Wins', estimatedDuration: 75,
+    driftExplanation: '15% done. Cover letter draft is too generic but there are 6 days to polish it. About 25 min/day is enough to hit the portal deadline comfortably.',
+    hotStartContent: '',
+    negotiatedDraft: `Dear Google Recruiting Team,\n\nI am a senior Computer Science student passionate about building scalable systems...`,
+    completionPercent: 15, sparkline: sparkline('flat', 25), isRescheduled: false,
+    rawInput: 'Complete Google STEP internship application before portal closes',
+    creditValue: 160, creditsAwarded: false,
+    subtasks: [
+      sub('Research Google STEP programme requirements', 20, true),
+      sub('Tailor cover letter to Google\'s engineering culture', 45, false),
+      sub('Update resume with recent capstone work', 30, false),
+      sub('Fill in application form (projects, GPA, coursework)', 30, false),
+      sub('Submit and confirm receipt email', 10, false),
+    ],
+    mode: 'normal', createdAt: daysAgo(1), updatedAt: hoursAgo(8),
+  });
+
+  // ── T20 · AMBER · CODE · 6 days · Capstone REST API sprint ──────────────
+  ids.t20 = uuidv4();
+  tasks.push({
+    userId, id: ids.t20,
+    taskName: 'Capstone: REST API Final Endpoints + Swagger Docs',
+    deadline: daysFromNow(6), taskType: 'CODE', cognitiveWeight: 'MEDIUM',
+    selfOwned: true, recipientName: null,
+    currentPaceHoursPerDay: 1.8, status: 'AMBER',
+    energyLevel: 'Deep Focus', estimatedDuration: 120,
+    driftExplanation: '15% complete — first endpoint done. 6 endpoints still unimplemented but 6 days is workable. Sprint demo expects a working API — steady 30 min/day keeps this on track.',
+    hotStartContent: '', negotiatedDraft: '',
+    completionPercent: 15, sparkline: sparkline('up', 20), isRescheduled: false,
+    rawInput: 'Finish remaining REST API endpoints and Swagger docs for capstone sprint demo',
+    creditValue: 300, creditsAwarded: false,
+    subtasks: [
+      sub('Implement /api/notifications with pagination', 60, true),
+      sub('Implement /api/search with Elasticsearch integration', 90, false),
+      sub('Implement /api/analytics aggregation endpoint', 75, false),
+      sub('Implement /api/export (CSV + JSON)', 45, false),
+      sub('Implement /api/admin user management', 60, false),
+      sub('Write Swagger/OpenAPI 3.0 docs for all endpoints', 60, false),
+      sub('Integration tests for all new endpoints', 45, false),
+    ],
+    mode: 'normal', createdAt: daysAgo(3), updatedAt: hoursAgo(2),
   });
 
 
@@ -526,8 +602,8 @@ function buildGoals(userId, tasks) {
     {
       userId, id: uuidv4(),
       title: 'Land a Top-Tier SWE Internship (Google / Meta / Stripe)',
-      description: 'Submit applications, pass technical screens, ace systems design rounds. Meta take-home is the immediate gate.',
-      linkedTaskIds: [ids.t2],
+      description: 'Submit applications, pass technical screens, ace systems design rounds. Meta take-home, Stripe screen, and Google application are all in flight.',
+      linkedTaskIds: [ids.t2, ids.t18, ids.t19],
       targetDate: daysFromNow(45),
       progressPercent: 35,
       createdAt: daysAgo(30),
@@ -617,15 +693,15 @@ function buildCheckIns(userId, tasks) {
   ci.push({ userId, id: uuidv4(), taskId: ids.t3, timestamp: daysAgo(6),
     selfReportText: 'Fixed most bugs, maybe 40% now but race condition still hits', selfReportPercent: 40, trustScore: 88 });
   ci.push({ userId, id: uuidv4(), taskId: ids.t3, timestamp: daysAgo(5),
-    selfReportText: 'Wrote some tests, feeling 45% but OT is hard', selfReportPercent: 45, trustScore: 82 });
+    selfReportText: 'Wrote some tests, feeling 25% but OT is hard', selfReportPercent: 25, trustScore: 82 });
   ci.push({ userId, id: uuidv4(), taskId: ids.t3, timestamp: daysAgo(4),
-    selfReportText: 'Probably 48%? CRDT theory is trickier than I expected', selfReportPercent: 48, trustScore: 77 });
+    selfReportText: 'Probably 28%? CRDT theory is trickier than I expected', selfReportPercent: 28, trustScore: 77 });
   ci.push({ userId, id: uuidv4(), taskId: ids.t3, timestamp: daysAgo(3),
-    selfReportText: 'Should be 50% — integration tests failing a lot though', selfReportPercent: 50, trustScore: 71 });
+    selfReportText: 'Maybe 30% — integration tests still failing', selfReportPercent: 30, trustScore: 71 });
   ci.push({ userId, id: uuidv4(), taskId: ids.t3, timestamp: daysAgo(1),
-    selfReportText: 'Told teammate 55%, honestly might be less', selfReportPercent: 55, trustScore: 64 });
+    selfReportText: 'Told teammate 35%, honestly might be less', selfReportPercent: 35, trustScore: 64 });
   ci.push({ userId, id: uuidv4(), taskId: ids.t3, timestamp: hoursAgo(6),
-    selfReportText: 'I said 60% but honestly the OT implementation is a mess — probably 34% real', selfReportPercent: 60, trustScore: 58 });
+    selfReportText: 'I said 35% but the OT implementation is a mess — subtask tracker shows only 1/6 done (~17%)', selfReportPercent: 35, trustScore: 62 });
 
   // ── T5 Raft (CODE) — 7 check-ins, honest and accurate, trust 97→99 ───────
   ci.push({ userId, id: uuidv4(), taskId: ids.t5, timestamp: daysAgo(8),
@@ -639,9 +715,9 @@ function buildCheckIns(userId, tasks) {
   ci.push({ userId, id: uuidv4(), taskId: ids.t5, timestamp: daysAgo(4),
     selfReportText: 'Replication works, now debugging split-brain edge case', selfReportPercent: 48, trustScore: 99 });
   ci.push({ userId, id: uuidv4(), taskId: ids.t5, timestamp: daysAgo(2),
-    selfReportText: 'Still 48%, split-brain is harder than expected but I see the fix', selfReportPercent: 48, trustScore: 99 });
+    selfReportText: 'Split-brain fixed! 3 of 6 subtasks done — sitting at 50%', selfReportPercent: 50, trustScore: 99 });
   ci.push({ userId, id: uuidv4(), taskId: ids.t5, timestamp: hoursAgo(10),
-    selfReportText: 'Split-brain fix in progress, tests passing at 48% subtask mark', selfReportPercent: 48, trustScore: 98 });
+    selfReportText: 'Tests passing at 50% subtask mark, on track for deadline', selfReportPercent: 50, trustScore: 99 });
 
   // ── T6 ML Paper (WRITING) — 8 check-ins, stale last 3 days, trust gap 14% ─
   ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(14),
@@ -659,7 +735,7 @@ function buildCheckIns(userId, tasks) {
   ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(4),
     selfReportText: 'Results tables half-done. Stuck waiting for one experiment run. 58%', selfReportPercent: 58, trustScore: 78 });
   ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(3),
-    selfReportText: 'Honest: results section incomplete, more like 55%. Stopped faking it', selfReportPercent: 55, trustScore: 84 });
+    selfReportText: 'Honest: results section barely started, more like 43%. Stopped padding the number.', selfReportPercent: 43, trustScore: 87 });
 
   // ── T4 Grading (OTHER) — 5 check-ins over 5 days ────────────────────────
   ci.push({ userId, id: uuidv4(), taskId: ids.t4, timestamp: daysAgo(5),
@@ -1268,12 +1344,12 @@ function buildAgentLog(userId, tasks) {
   entries.push({
     id: uuidv4(), userId,
     featureKey: 'behavioral_drift',
-    title: 'Detected a 14% gap between reported and real progress on "ML Research Paper"',
-    reasoning: 'Self-reported: 55% · Behavioral estimate: 41%. Signals: Subtasks 3/7 complete (43%); last check-in 3 days ago, behind expected pace line. Trust Decay actively draining.',
+    title: 'Detected a 12% gap between reported and real progress on "ML Research Paper"',
+    reasoning: 'Self-reported: 55% · Behavioral estimate: 43%. Signals: Subtasks 3/7 complete (43%); last check-in 3 days ago, behind expected pace line. Trust Decay actively draining.',
     outcome: 'Flagged — no check-in in 3 days while reporting 55%. Trust Decay displaying adjusted progress bar.',
     autonomy: 'autonomous', undoable: false, undone: false,
     relatedTaskId: ids.t6, relatedTaskName: 'ML Research Paper — Contrastive Learning for Low-Resource NLP',
-    metadata: { gap: -14, inferredReal: 41, selfReported: 55, confidence: 'medium',
+    metadata: { gap: -12, inferredReal: 43, selfReported: 55, confidence: 'medium',
       signals: { subtask: 43, staleness: -12, panic: 0, language: 0 } },
     createdAt: hoursAgo(4),
   });
@@ -1366,11 +1442,11 @@ function buildAgentLog(userId, tasks) {
   entries.push({
     id: uuidv4(), userId, featureKey: 'behavioral_drift',
     title: 'Trust Decay active on "ML Research Paper" — no check-in in 3 days',
-    reasoning: 'Last check-in was 3 days ago. Trust Decay formula reducing displayed progress from 55% toward actual 41%.',
-    outcome: 'Decay bar visible on task card. Recalibrate: submit a check-in to stop decay.',
+    reasoning: 'Last check-in was 3 days ago. Trust Decay formula reducing displayed progress from 43% — stale data warning shown.',
+    outcome: 'Decay bar visible on task card. Submit a check-in to stop decay.',
     autonomy: 'autonomous', undoable: false, undone: false,
     relatedTaskId: ids.t6, relatedTaskName: 'ML Research Paper — Contrastive Learning for Low-Resource NLP',
-    metadata: { reportedPercent: 55, decayedPercent: 49, daysSinceCheckin: 3 },
+    metadata: { reportedPercent: 43, decayedPercent: 40, daysSinceCheckin: 3 },
     createdAt: daysAgo(2),
   });
 

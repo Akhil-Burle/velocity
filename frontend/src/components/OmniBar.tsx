@@ -5,8 +5,8 @@
  *
  * Phase 1: Structured-output intent classifier → 8 canonical intents
  * Phase 2: Execution, not display
- *   - HIGH confidence   → CountdownToast (10s) → auto-executes via omni-execute
- *   - MEDIUM confidence → CountdownToast (14s) with clearer framing
+ *   - HIGH confidence   → CountdownToast (5s) → auto-executes via omni-execute
+ *   - MEDIUM confidence → CountdownToast (7s) with clearer framing
  *   - LOW / unclear     → context-aware action buttons (not always Triage/Panic)
  *   - query intent      → text answer only, no action
  * Phase 3: Voice-out — uses real Google Cloud TTS (with browser fallback)
@@ -65,12 +65,12 @@ const INTENT_CONFIG: Record<string, {
   icon: string;
   duration: number; // countdown seconds
 }> = {
-  create_task:   { color: 'green',  label: 'Creating task',      icon: '✏️', duration: 10 },
-  run_triage:    { color: 'amber',  label: 'Running Triage',     icon: '⚡', duration: 10 },
-  panic_mode:    { color: 'red',    label: 'Activating Panic Mode', icon: '🚨', duration: 10 },
-  smart_routing: { color: 'blue',   label: 'Routing to top task', icon: '🎯', duration: 8  },
-  negotiate:     { color: 'amber',  label: 'Drafting extension',  icon: '📧', duration: 12 },
-  rebalance:     { color: 'green',  label: 'Rebalancing schedule', icon: '📅', duration: 10 },
+  create_task:   { color: 'green',  label: 'Creating task',      icon: '✏️', duration: 5 },
+  run_triage:    { color: 'amber',  label: 'Running Triage',     icon: '⚡', duration: 5 },
+  panic_mode:    { color: 'red',    label: 'Activating Panic Mode', icon: '🚨', duration: 5 },
+  smart_routing: { color: 'blue',   label: 'Routing to top task', icon: '🎯', duration: 4  },
+  negotiate:     { color: 'amber',  label: 'Drafting extension',  icon: '📧', duration: 5 },
+  rebalance:     { color: 'green',  label: 'Rebalancing schedule', icon: '📅', duration: 5 },
   query:         { color: 'blue',   label: 'Answering',           icon: '💬', duration: 0  },
   unclear:       { color: 'amber',  label: 'Needs clarification', icon: '❓', duration: 0  },
 };
@@ -237,8 +237,21 @@ const OmniBar: React.FC<OmniBarProps> = ({ isOpen, onClose, onActionComplete, is
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      runClassify(value);
+      // If already classified and in a countdown/buttons phase, execute immediately
+      const c = classifiedRef.current;
+      if (c && (phase === 'countdown_high' || phase === 'countdown_medium' || phase === 'buttons')) {
+        executeAction(c, valueRef.current);
+      } else {
+        // Still classifying — classify then immediately execute on result
+        runClassify(value).then(() => {
+          const fresh = classifiedRef.current;
+          if (fresh && fresh.intent !== 'query' && fresh.intent !== 'unclear' && fresh.confidence !== 'low') {
+            executeAction(fresh, valueRef.current);
+          }
+        });
+      }
     }
   };
 
@@ -520,7 +533,7 @@ const OmniBar: React.FC<OmniBarProps> = ({ isOpen, onClose, onActionComplete, is
                     <CountdownToast
                       message={countdownMessage()}
                       subtext={countdownSubtext() || undefined}
-                      duration={intentCfg.duration || 10}
+                      duration={intentCfg.duration || 5}
                       color={intentCfg.color}
                       onExecute={() => executeAction(classified, value)}
                       onCancel={handleCountdownCancel}
@@ -549,7 +562,7 @@ const OmniBar: React.FC<OmniBarProps> = ({ isOpen, onClose, onActionComplete, is
                     <CountdownToast
                       message={countdownMessage()}
                       subtext={countdownSubtext() || undefined}
-                      duration={(intentCfg.duration || 10) + 4}
+                      duration={(intentCfg.duration || 5) + 2}
                       color={intentCfg.color}
                       onExecute={() => executeAction(classified, value)}
                       onCancel={handleCountdownCancel}

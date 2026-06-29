@@ -1,149 +1,272 @@
 /**
  * services/googleCalendarService.js
- * ─────────────────────────────────────────────────────────────────────────────
- * Real Google Calendar API integration.
  *
- * Uses the server-owned OAuth refresh token (GOOGLE_REFRESH_TOKEN) to read
- * the demo account's real calendar events. These events feed directly into:
- *   - Command Day / getDayPlan  — real meetings block time in the schedule
- *   - AI Rebalance              — avoids scheduling focus blocks over real events
- *   - Smart Reschedule          — packs subtasks around real calendar gaps
+ * Two-way Google Calendar sync.
+ * - READ  : getBlockedSlotsForDate, fetchRealCalendarEvents
+ * - WRITE : createCalendarEvent, deleteCalendarEvent, syncVelocityToCalendar
  *
- * Auth model: single server-owned refresh token. All demo sessions share the
- * same Google account — standard for hackathon demos. The refresh token
- * auto-renews access tokens via googleapis OAuth2 client.
+ * Works in Google OAuth test mode — only the authorized test user needs
+ * to have gone through the OAuth flow once to generate a refresh token.
+ * Store that token as GOOGLE_REFRESH_TOKEN in backend/.env.
  *
- * Scopes required (already granted via get-google-token.js):
- *   https://www.googleapis.com/auth/calendar.readonly
+ * All functions fail silently (return safe defaults) when credentials
+ * are not configured, so demo mode is never broken.
  */
 
-const { google } = require('googleapis');
+const { google } = (() => {
+  try { return require('googleapis'); }
+  catch { return { google: null }; }
+})();
 
-let _oauth2Client = null;
-let _calendarApi  = null;
+// ── Auth helper — reused by every function ────────────────────────────────────
 
-function getCalendarClient() {
-  if (_calendarApi) return _calendarApi;
+function getAuthClient() {
+  if (!google) return null;
+  if (
+    !process.env.GOOGLE_CLIENT_ID ||
+    !process.env.GOOGLE_CLIENT_SECRET ||
+    !process.env.GOOGLE_REFRESH_TOKEN
+  ) return null;
 
-  const clientId     = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
-
-  if (!clientId || clientId === 'your_google_client_id_here' ||
-      !clientSecret || !refreshToken) {
-    return null; // Google Calendar not configured — fall back to internal data
-  }
-
-  _oauth2Client = new google.auth.OAuth2(
-    clientId,
-    clientSecret,
-    process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3001/api/agent/oauth/callback'
+  const auth = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET
   );
-  _oauth2Client.setCredentials({ refresh_token: refreshToken });
-
-  _calendarApi = google.calendar({ version: 'v3', auth: _oauth2Client });
-  console.log('[CalendarService] Google Calendar API client initialized');
-  return _calendarApi;
+  auth.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
+  return auth;
 }
 
 /**
- * Fetch real calendar events for the next N days from the user's primary calendar.
- * Returns an array of simplified event objects compatible with the existing
- * CalendarEvent shape used by Command Day and the calendar view.
- *
- * @param {number} daysAhead  — how many days forward to fetch (default 7)
- * @returns {Promise<Array>}  — simplified event objects, or [] if unavailable
- */
-async function fetchRealCalendarEvents(daysAhead = 7) {
-  const calendar = getCalendarClient();
-  if (!calendar) {
-    console.log('[CalendarService] No credentials — skipping real calendar fetch');
-    return [];
-  }
-
-  try {
-    const now = new Date();
-    const timeMax = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
-
-    const response = await calendar.events.list({
-      calendarId: 'primary',
-      timeMin:    now.toISOString(),
-      timeMax:    timeMax.toISOString(),
-      singleEvents: true,
-      orderBy:   'startTime',
-      maxResults: 50,
-      fields:    'items(id,summary,start,end,status,eventType)',
-    });
-
-    const items = response.data.items || [];
-
-    // Map to our internal CalendarEvent shape (meeting/blocking type)
-    return items
-      .filter(ev => ev.status !== 'cancelled')
-      .map(ev => {
-        const start = ev.start?.dateTime || ev.start?.date;
-        const end   = ev.end?.dateTime   || ev.end?.date;
-        const startDate = new Date(start);
-        const endDate   = new Date(end);
-
-        // All-day events have no time component — skip for scheduling purposes
-        const isAllDay = !ev.start?.dateTime;
-
-        return {
-          id:            `gcal-${ev.id}`,
-          taskId:        null,
-          taskName:      ev.summary || 'Untitled Event',
-          subtaskTitle:  '',
-          date:          startDate.toISOString().slice(0, 10),
-          startTime:     isAllDay ? '00:00' : `${String(startDate.getHours()).padStart(2,'0')}:${String(startDate.getMinutes()).padStart(2,'0')}`,
-          endTime:       isAllDay ? '23:59' : `${String(endDate.getHours()).padStart(2,'0')}:${String(endDate.getMinutes()).padStart(2,'0')}`,
-          status:        'GREEN',
-          taskType:      'OTHER',
-          estimatedMinutes: isAllDay ? 0 : Math.round((endDate - startDate) / 60000),
-          isRealCalendarEvent: true,
-          isAllDay,
-          source:        'google_calendar',
-        };
-      })
-      .filter(ev => !ev.isAllDay); // exclude all-day events from time blocking
-  } catch (err) {
-    console.warn('[CalendarService] Failed to fetch real calendar events (non-fatal):', err.message);
-    return [];
-  }
-}
-
-/**
- * Get blocked time ranges from real calendar events on a specific date.
- * Used by Command Day and Rebalance to avoid scheduling over real meetings.
- *
- * @param {string} dateStr  — 'YYYY-MM-DD'
- * @returns {Array<{startMins: number, endMins: number, title: string}>}
- */
-async function getBlockedSlotsForDate(dateStr) {
-  const events = await fetchRealCalendarEvents(14);
-  return events
-    .filter(ev => ev.date === dateStr && !ev.isAllDay)
-    .map(ev => {
-      const [sh, sm] = ev.startTime.split(':').map(Number);
-      const [eh, em] = ev.endTime.split(':').map(Number);
-      return {
-        startMins: sh * 60 + sm,
-        endMins:   eh * 60 + em,
-        title:     ev.taskName,
-      };
-    });
-}
-
-/**
- * Is Google Calendar connected and working?
+ * Returns true only when all required OAuth env vars are present.
  */
 function isCalendarConfigured() {
   return !!(
     process.env.GOOGLE_CLIENT_ID &&
-    process.env.GOOGLE_CLIENT_ID !== 'your_google_client_id_here' &&
     process.env.GOOGLE_CLIENT_SECRET &&
     process.env.GOOGLE_REFRESH_TOKEN
   );
 }
 
-module.exports = { fetchRealCalendarEvents, getBlockedSlotsForDate, isCalendarConfigured };
+// ── READ ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Returns blocked time slots from Google Calendar for a given date.
+ * Each slot: { startMins, endMins, title, gcalId }
+ */
+async function getBlockedSlotsForDate(dateStr) {
+  const auth = getAuthClient();
+  if (!auth) return [];
+
+  try {
+    const calendar = google.calendar({ version: 'v3', auth });
+    const start = new Date(dateStr + 'T00:00:00');
+    const end   = new Date(dateStr + 'T23:59:59');
+
+    const res = await calendar.events.list({
+      calendarId: 'primary',
+      timeMin: start.toISOString(),
+      timeMax: end.toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime',
+    });
+
+    return (res.data.items || [])
+      .filter(e => e.start?.dateTime && e.end?.dateTime)
+      .map(e => {
+        const s = new Date(e.start.dateTime);
+        const f = new Date(e.end.dateTime);
+        return {
+          startMins: s.getHours() * 60 + s.getMinutes(),
+          endMins:   f.getHours() * 60 + f.getMinutes(),
+          title:     e.summary || 'Meeting',
+          gcalId:    e.id,
+        };
+      });
+  } catch (err) {
+    console.warn('[GoogleCalendar] getBlockedSlotsForDate failed:', err.message);
+    return [];
+  }
+}
+
+/**
+ * Fetches real calendar events for the next N days.
+ */
+async function fetchRealCalendarEvents(days = 14) {
+  const auth = getAuthClient();
+  if (!auth) return [];
+
+  try {
+    const calendar = google.calendar({ version: 'v3', auth });
+    const start = new Date();
+    const end   = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+    const res = await calendar.events.list({
+      calendarId: 'primary',
+      timeMin: start.toISOString(),
+      timeMax: end.toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime',
+      maxResults: 100,
+    });
+
+    const pad = n => String(n).padStart(2, '0');
+
+    return (res.data.items || [])
+      .filter(e => e.start?.dateTime && e.end?.dateTime)
+      .map(e => {
+        const s = new Date(e.start.dateTime);
+        const f = new Date(e.end.dateTime);
+        return {
+          id:           `gcal-${e.id}`,
+          gcalId:       e.id,
+          type:         'meeting',
+          taskId:       null,
+          taskName:     e.summary || 'Meeting',
+          subtaskTitle: e.summary || 'Meeting',
+          date:         s.toISOString().slice(0, 10),
+          startTime:    `${pad(s.getHours())}:${pad(s.getMinutes())}`,
+          endTime:      `${pad(f.getHours())}:${pad(f.getMinutes())}`,
+          status:       'GREEN',
+          taskType:     'OTHER',
+          isRealCalendarEvent: true,
+          task:         null,
+        };
+      });
+  } catch (err) {
+    console.warn('[GoogleCalendar] fetchRealCalendarEvents failed:', err.message);
+    return [];
+  }
+}
+
+// ── WRITE ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Creates a Google Calendar event for a Velocity task block.
+ * Returns the created event's Google Calendar ID, or null on failure.
+ *
+ * @param {object} block  { taskName, date, startTime, endTime, status, cognitiveWeight }
+ * @returns {string|null} gcalEventId
+ */
+async function createCalendarEvent(block) {
+  const auth = getAuthClient();
+  if (!auth) return null;
+
+  try {
+    const calendar = google.calendar({ version: 'v3', auth });
+
+    // Build RFC3339 datetimes in local time (use UTC offset of the server)
+    const tzOffset = -new Date().getTimezoneOffset(); // minutes ahead of UTC
+    const tzSign   = tzOffset >= 0 ? '+' : '-';
+    const tzHH     = String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, '0');
+    const tzMM     = String(Math.abs(tzOffset) % 60).padStart(2, '0');
+    const tz       = `${tzSign}${tzHH}:${tzMM}`;
+
+    const startDT = `${block.date}T${block.startTime}:00${tz}`;
+    const endDT   = `${block.date}T${block.endTime}:00${tz}`;
+
+    // Colour: red=11 for RED, yellow=5 for AMBER, green=2 for GREEN
+    const colorId = block.status === 'RED' ? '11' : block.status === 'AMBER' ? '5' : '2';
+
+    const energyLabel = block.cognitiveWeight === 'HIGH' ? '🧠 Deep Focus' : '⚡ Quick Win';
+
+    const event = {
+      summary:     `⚡ ${block.taskName}`,
+      description: `Scheduled by Velocity\nType: ${energyLabel}\nStatus: ${block.status}\n\nOpen Velocity to update progress.`,
+      start:       { dateTime: startDT },
+      end:         { dateTime: endDT },
+      colorId,
+      // Tag with Velocity source so we can identify & delete our own events
+      extendedProperties: {
+        private: {
+          velocityTaskId: block.taskId || '',
+          velocitySync:   'true',
+        },
+      },
+    };
+
+    const res = await calendar.events.insert({ calendarId: 'primary', resource: event });
+    console.log(`[GoogleCalendar] Created event: ${res.data.id} — ${block.taskName}`);
+    return res.data.id;
+  } catch (err) {
+    console.warn('[GoogleCalendar] createCalendarEvent failed:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Deletes a Google Calendar event by its gcalEventId.
+ * Silent no-op if event not found or already deleted.
+ */
+async function deleteCalendarEvent(gcalEventId) {
+  const auth = getAuthClient();
+  if (!auth || !gcalEventId) return;
+
+  try {
+    const calendar = google.calendar({ version: 'v3', auth });
+    await calendar.events.delete({ calendarId: 'primary', eventId: gcalEventId });
+    console.log(`[GoogleCalendar] Deleted event: ${gcalEventId}`);
+  } catch (err) {
+    // 410 Gone = already deleted — not an error
+    if (err.code !== 410 && err.status !== 410) {
+      console.warn('[GoogleCalendar] deleteCalendarEvent failed:', err.message);
+    }
+  }
+}
+
+/**
+ * Full two-way sync:
+ * 1. Delete all existing Velocity-owned events in the next 14 days
+ * 2. Push fresh events from the Velocity schedule
+ *
+ * Returns { created, deleted, errors }
+ */
+async function syncVelocityToCalendar(velocityEvents) {
+  const auth = getAuthClient();
+  if (!auth) return { created: 0, deleted: 0, errors: ['Not configured'] };
+
+  const calendar = google.calendar({ version: 'v3', auth });
+  let deleted = 0;
+  let created = 0;
+  const errors = [];
+
+  try {
+    // Step 1: find and delete all previously synced Velocity events (next 14 days)
+    const start = new Date();
+    const end   = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
+    const existing = await calendar.events.list({
+      calendarId:    'primary',
+      timeMin:       start.toISOString(),
+      timeMax:       end.toISOString(),
+      singleEvents:  true,
+      maxResults:    200,
+      privateExtendedProperty: 'velocitySync=true',
+    });
+
+    for (const ev of (existing.data.items || [])) {
+      await deleteCalendarEvent(ev.id);
+      deleted++;
+    }
+  } catch (err) {
+    errors.push(`Delete sweep failed: ${err.message}`);
+  }
+
+  // Step 2: create fresh events for all focus blocks
+  for (const ev of velocityEvents.filter(e => e.type === 'focus' && e.taskId)) {
+    const gcalId = await createCalendarEvent(ev);
+    if (gcalId) created++;
+    else errors.push(`Failed to create: ${ev.taskName}`);
+  }
+
+  return { created, deleted, errors };
+}
+
+module.exports = {
+  isCalendarConfigured,
+  getAuthClient,
+  getBlockedSlotsForDate,
+  fetchRealCalendarEvents,
+  createCalendarEvent,
+  deleteCalendarEvent,
+  syncVelocityToCalendar,
+};

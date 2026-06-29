@@ -260,10 +260,6 @@ const EntryPoint: React.FC<EntryPointProps> = ({ onSubmit }) => {
             <Zap size={15} className="text-green-400" />
           </motion.div>
           <span className="font-bold text-sm tracking-tight" style={{ color: 'var(--text-primary)' }}>Velocity</span>
-          <span className="hidden sm:block text-[10px] font-mono px-1.5 py-0.5 rounded-full"
-            style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.22)', color: '#4ade80' }}>
-            v2
-          </span>
         </div>
         <div className="flex items-center gap-3">
           <WaveformAnimation />

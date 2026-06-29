@@ -16,6 +16,7 @@ import CommandDay from './components/CommandDay';
 import AgentLogPage from './components/AgentLogPage';
 import TechStackPage from './components/TechStackPage';
 import VelocityVectorPage from './components/VelocityVectorPage';
+import ApiDocsPage from './components/ApiDocsPage';
 import { ToastProvider } from './components/Toast';
 import { TourProvider } from './components/TourContext';
 import { Zap } from 'lucide-react';
@@ -144,6 +145,9 @@ function AppInner() {
         } />
         <Route path="/velocity-vector" element={
           <ShellPage><VelocityVectorPage /></ShellPage>
+        } />
+        <Route path="/api-docs" element={
+          <ShellPage><ApiDocsPage /></ShellPage>
         } />
 
         {/* Fallback */}

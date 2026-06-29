@@ -4,11 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import {
   Zap, FastForward, CheckCircle, ChevronRight,
   RefreshCw, TrendingUp, Clock, LayoutGrid, AlertTriangle, Plus,
+  Search, X as XIcon, ArrowUpDown, SlidersHorizontal,
 } from 'lucide-react';import { Task, PaceStatus } from '../types';
 
-// OS-aware keyboard shortcut label
-const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
-const KBD_LABEL = IS_MAC ? '⌘K' : 'Ctrl+K';
 import { calcRequiredHoursPerDay, derivePaceStatus, computePaceMetrics, fmtHours } from '../data';
 import { useTheme } from '../ThemeContext';
 import { useCredits } from '../CreditsContext';
@@ -18,10 +16,9 @@ import TaskDetailModal from './TaskDetailModal';
 import CreateTaskModal from './CreateTaskModal';
 import VelocityReport from './VelocityReport';
 import SkeletonCard from './SkeletonCard';
-import BrainDumpInput from './BrainDumpInput';
+import BrainDumpInput, { BrainDumpInputHandle } from './BrainDumpInput';
 import BurnoutChart from './BurnoutChart';
 import ForecastPanel from './ForecastPanel';
-import OmniBar from './OmniBar';
 import {
   submitBrainDump,
   fetchTasks,
@@ -194,25 +191,8 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
   const [ultimatum, setUltimatum] = useState<UltimatumState | null>(null);
   // Zero-Hour state
   const [panicState, setPanicState]     = useState<PanicState | null>(null);
-  // OmniBar state
-  const [omniBarOpen, setOmniBarOpen]   = useState(false);
-  const [omniInitialValue, setOmniInitialValue] = useState<string | undefined>(undefined);
   const [forecastHealth, setForecastHealth] = useState<number | null>(null);
   const [pendingDeadlineTasks, setPendingDeadlineTasks] = useState<Task[]>([]);
-
-  // Pick up a task description carried over from the landing hero task bar.
-  // Opens the OmniBar pre-filled so the visitor's first typed thought is
-  // classified and acted on the moment they land in the dashboard.
-  useEffect(() => {
-    let pending: string | null = null;
-    try { pending = sessionStorage.getItem('velocity_pending_omni'); } catch { /* ignore */ }
-    if (pending && pending.trim()) {
-      try { sessionStorage.removeItem('velocity_pending_omni'); } catch { /* ignore */ }
-      setOmniInitialValue(pending.trim());
-      const t = setTimeout(() => setOmniBarOpen(true), 1100);
-      return () => clearTimeout(t);
-    }
-  }, []);
 
   // Pending triage — shows a countdown toast before actually applying the reschedule
   const [pendingTriage, setPendingTriage] = useState<{ taskId: string; taskName: string } | null>(null);
@@ -220,6 +200,39 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
   // Detail modal — lifted to Dashboard level so re-renders never close it
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+
+  // ── Search / filter / sort state ─────────────────────────────────────────
+  const [searchQuery, setSearchQuery]   = useState('');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'RED' | 'AMBER' | 'GREEN'>('ALL');
+  const [sortBy, setSortBy]             = useState<'deadline' | 'drift' | 'progress' | 'default'>('default');
+  const [sortOpen, setSortOpen]         = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const sortRef = useRef<HTMLDivElement>(null);
+  const brainDumpRef = useRef<BrainDumpInputHandle>(null);
+
+  // Auto-focus the task entry bar when user starts typing anywhere on the dashboard
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Ignore: modifier combos, special keys, already focused in an input/textarea
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key.length !== 1) return; // ignore arrows, F-keys, etc.
+      brainDumpRef.current?.focus();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
+  // Close sort dropdown on outside click
+  useEffect(() => {
+    if (!sortOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) setSortOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [sortOpen]);
 
   // ── Drag-and-drop state ────────────────────────────────────────────────────
   const dragIdRef = useRef<string | null>(null);
@@ -298,6 +311,37 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
   const activeTasks     = tasks.filter(t => !t.isRescheduled && t.status !== 'COMPLETE' && t.status !== 'failed');
   const rescheduledTasks= tasks.filter(t => t.isRescheduled || t.status === 'failed'); // failed tasks fold into rescheduled
   const completedTasks  = tasks.filter(t => t.status === 'COMPLETE');
+
+  // ── Filtered + sorted active tasks ──────────────────────────────────────
+  const displayedTasks = React.useMemo(() => {
+    let list = [...activeTasks];
+    // Search
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(t =>
+        t.taskName.toLowerCase().includes(q) ||
+        (t.course ?? '').toLowerCase().includes(q) ||
+        (t.taskType ?? '').toLowerCase().includes(q)
+      );
+    }
+    // Filter by status
+    if (filterStatus !== 'ALL') {
+      list = list.filter(t => t.status === filterStatus);
+    }
+    // Sort
+    if (sortBy === 'deadline') {
+      list.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+    } else if (sortBy === 'drift') {
+      list.sort((a, b) => {
+        const ma = a.paceMetrics ?? computePaceMetrics(a);
+        const mb = b.paceMetrics ?? computePaceMetrics(b);
+        return ma.drift - mb.drift; // most behind first
+      });
+    } else if (sortBy === 'progress') {
+      list.sort((a, b) => a.completionPercent - b.completionPercent); // least done first
+    }
+    return list;
+  }, [activeTasks, searchQuery, filterStatus, sortBy]);
   const onPaceCount = activeTasks.filter(t => t.status === 'GREEN').length;
   const criticalCount = activeTasks.filter(t => t.status === 'RED').length;
   const warningCount = activeTasks.filter(t => t.status === 'AMBER').length;
@@ -462,17 +506,12 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
     navigate('/calendar');
   };
 
-  // ── CMD+K OmniBar keyboard shortcut ────────────────────────────────────────
+  // ── Refresh tasks when the global OmniBar (in AppShell) executes an action ──
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setOmniBarOpen(true);
-      }
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, []);
+    const handler = () => { loadTasks().catch(() => {}); };
+    window.addEventListener('velocity:omni-action', handler);
+    return () => window.removeEventListener('velocity:omni-action', handler);
+  }, [loadTasks]);
 
   // ── Auto-recalc telemetry every 60s — real-time drift detection ─────────────
   useEffect(() => {
@@ -560,27 +599,29 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
             {!loading && warningCount > 0 && <StatChip key="am" value={`${warningCount}`} label="Warning" color="#f59e0b" isDark={isDark} />}
             {!loading && criticalCount > 0 && <StatChip key="rd" value={`${criticalCount}`} label="Critical" color="#ef4444" pulse isDark={isDark} />}
           </AnimatePresence>
-          {/* OmniBar Ctrl+K / ⌘K pill */}
-          <div className="relative ml-auto">
+          {/* OmniBar Ctrl+K / ⌘K pill — now rendered globally in AppShell; keep tour anchor */}
+          <div className="relative ml-auto flex items-center gap-2" data-tour="tour-omni">
             <motion.button
-              data-tour="tour-omni"
-              onClick={() => setOmniBarOpen(true)}
-              whileHover={{ scale: 1.05, boxShadow: '0 0 12px rgba(34,197,94,0.25)' }}
-              whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-mono font-semibold"
+              onClick={() => setCreateModalOpen(true)}
+              whileHover={{ scale: 1.03, boxShadow: '0 0 18px rgba(34,197,94,0.2)' }}
+              whileTap={{ scale: 0.97 }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
               style={{
-                background: 'rgba(34,197,94,0.08)',
+                background: 'linear-gradient(135deg, rgba(34,197,94,0.15), rgba(22,163,74,0.1))',
                 color: '#4ade80',
-                border: '1px solid rgba(34,197,94,0.22)',
+                border: '1px solid rgba(34,197,94,0.35)',
+                boxShadow: '0 0 8px rgba(34,197,94,0.08)',
+                letterSpacing: '0.01em',
               }}
             >
-              <span style={{ fontSize: 11 }}>⌨</span>
-              <span className="hidden sm:inline">{KBD_LABEL}</span>
+              <Plus size={11} strokeWidth={2.5} />
+              <span>New Manual Task</span>
             </motion.button>
           </div>
         </div>
         <div data-tour="tour-braindump">
           <BrainDumpInput
+            ref={brainDumpRef}
             onSubmit={handleQuickEntry}
             onTasksExtracted={(newTasks) => setTasks(prev => [...prev, ...newTasks])}
             loading={entryLoading}
@@ -593,69 +634,6 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
 
       {/* ── Main ────────────────────────────────────────────────────────────── */}
       <main className="flex-1 relative z-10 px-4 sm:px-6 py-6 pb-28">
-
-        {/* Action buttons row */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <AnimatePresence>
-              {sentEmails.size > 0 && (
-                <motion.div initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 8 }}
-                  className="hidden sm:flex items-center gap-1.5 text-xs text-green-500 font-mono">
-                  <CheckCircle size={11} /><span>{sentEmails.size} sent</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            {/* Create Task button */}
-            <motion.button
-              onClick={() => setCreateModalOpen(true)}
-              whileHover={{ scale: 1.04, boxShadow: '0 0 16px rgba(34,197,94,0.25)' }}
-              whileTap={{ scale: 0.96 }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold"
-              style={{ background: 'rgba(34,197,94,0.1)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.28)' }}
-            >
-              <Plus size={12} />
-              <span className="hidden sm:inline">New Task</span>
-            </motion.button>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Triage button */}
-            <div className="relative">
-              <motion.button onClick={handleTriage} disabled={loading || triageLoading}
-                data-tour="tour-triage"
-                whileHover={!loading && !triageLoading ? { scale: 1.04 } : {}}
-                whileTap={!loading && !triageLoading ? { scale: 0.96 } : {}}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all"
-                style={loading || triageLoading
-                  ? { background: 'var(--bg-surface)', color: 'var(--text-faint)', border: `1px solid ${surfaceBorder}`, cursor: 'not-allowed', opacity: 0.5 }
-                  : { background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.22)' }}>
-                {triageLoading
-                  ? <motion.div className="w-3 h-3 rounded-full border-2 border-amber-400 border-t-transparent" animate={{ rotate: 360 }} transition={{ duration: 0.7, repeat: Infinity }} />
-                  : <Zap size={12} />}
-                <span className="hidden sm:inline">Triage</span>
-              </motion.button>
-            </div>
-
-            {/* ETA Check button — Zero-Hour Feature 2 */}
-            <motion.button onClick={handleFastForward} disabled={fastForwarded || loading}
-              whileHover={!fastForwarded && !loading ? { scale: 1.04 } : {}}
-              whileTap={!fastForwarded && !loading ? { scale: 0.96 } : {}}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all"
-              style={fastForwarded || loading
-                ? { background: 'var(--bg-surface)', color: 'var(--text-faint)', border: `1px solid ${surfaceBorder}`, cursor: 'not-allowed', opacity: 0.5 }
-                : { background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.22)' }}>
-              <FastForward size={12} />
-              <span className="hidden sm:inline">Fast Forward</span>
-            </motion.button>
-
-            <motion.button onClick={() => setTasks(prev => recalcTelemetry(prev))} disabled={loading}
-              whileHover={!loading ? { scale: 1.08, rotate: 180 } : {}} whileTap={{ scale: 0.9 }}
-              transition={{ duration: 0.4 }}
-              className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
-              style={{ background: 'var(--bg-surface)', color: 'var(--text-muted)', border: `1px solid ${surfaceBorder}` }}>
-              <RefreshCw size={13} />
-            </motion.button>
-          </div>
-        </div>
 
         {/* Stats grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
@@ -705,9 +683,144 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
           />
         )}
 
-        {/* Active tasks */}
+        {/* Active tasks — header with search / filter / sort */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35, duration: 0.4 }}>
-          <SectionDivider label="Active Tasks" count={loading ? undefined : activeTasks.length} isDark={isDark} />
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Section label */}
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <span className="text-xs font-mono uppercase tracking-widest shrink-0"
+                style={{ color: isDark ? '#a1adb8' : '#64748b' }}>
+                Active Tasks
+                {!loading && (
+                  <motion.span key={displayedTasks.length} initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                    className="ml-2 px-1.5 py-0.5 rounded-full text-[10px]"
+                    style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)', border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)'}`, color: isDark ? '#a1adb8' : '#64748b' }}>
+                    {displayedTasks.length}{searchQuery || filterStatus !== 'ALL' ? ` of ${activeTasks.length}` : ''}
+                  </motion.span>
+                )}
+              </span>
+              <motion.div initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                className="flex-1 h-px origin-left" style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)' }} />
+            </div>
+
+            {/* Controls row */}
+            <div className="flex items-center gap-2 shrink-0">
+
+              {/* Search bar — always visible */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
+                style={{
+                  background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                  border: `1px solid ${searchQuery ? (isDark ? 'rgba(56,189,248,0.35)' : 'rgba(56,189,248,0.4)') : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)')}`,
+                  width: 180,
+                  transition: 'border-color 0.15s ease',
+                }}>
+                <Search size={11} style={{ color: searchQuery ? '#38bdf8' : 'var(--text-faint)', flexShrink: 0 }} />
+                <input
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search tasks…"
+                  className="bg-transparent border-none outline-none text-[11px] font-mono flex-1 min-w-0"
+                  style={{ color: 'var(--text-primary)' }}
+                />
+                <AnimatePresence>
+                  {searchQuery && (
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.6 }}
+                      onClick={() => setSearchQuery('')}
+                      style={{ color: 'var(--text-faint)', flexShrink: 0 }}>
+                      <XIcon size={10} />
+                    </motion.button>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Status filter pills */}
+              {(['ALL', 'RED', 'AMBER', 'GREEN'] as const).map(s => {
+                const active = filterStatus === s;
+                const color = s === 'RED' ? '#ef4444' : s === 'AMBER' ? '#f59e0b' : s === 'GREEN' ? '#22c55e' : (isDark ? '#a1adb8' : '#64748b');
+                return (
+                  <motion.button key={s}
+                    onClick={() => setFilterStatus(s)}
+                    whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.93 }}
+                    className="px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold uppercase tracking-wide transition-all"
+                    style={{
+                      background: active ? `${color}18` : 'transparent',
+                      border: `1px solid ${active ? `${color}40` : (isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)')}`,
+                      color: active ? color : 'var(--text-faint)',
+                    }}>
+                    {s === 'ALL' ? 'All' : s === 'RED' ? '⚠ Crit' : s === 'AMBER' ? '~ Warn' : '✓ OK'}
+                  </motion.button>
+                );
+              })}
+
+              {/* Sort dropdown */}
+              <div ref={sortRef} className="relative">
+                <motion.button
+                  onClick={() => setSortOpen(v => !v)}
+                  whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.93 }}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono uppercase tracking-wide"
+                  style={{
+                    background: sortBy !== 'default' ? 'rgba(56,189,248,0.1)' : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'),
+                    border: `1px solid ${sortBy !== 'default' ? 'rgba(56,189,248,0.28)' : (isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)')}`,
+                    color: sortBy !== 'default' ? '#38bdf8' : 'var(--text-faint)',
+                  }}>
+                  <ArrowUpDown size={10} />
+                  <span>{sortBy === 'default' ? 'Sort' : sortBy === 'deadline' ? 'Due' : sortBy === 'drift' ? 'Drift' : 'Progress'}</span>
+                </motion.button>
+                <AnimatePresence>
+                  {sortOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 6, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                      transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                      className="absolute right-0 top-8 z-30 rounded-xl overflow-hidden"
+                      style={{
+                        width: 148,
+                        background: isDark ? 'rgba(13,17,23,0.98)' : 'rgba(248,250,252,0.98)',
+                        border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+                        backdropFilter: 'blur(20px)',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
+                      }}>
+                      {([
+                        { key: 'default',  label: 'Default order' },
+                        { key: 'deadline', label: 'Soonest deadline' },
+                        { key: 'drift',    label: 'Most behind' },
+                        { key: 'progress', label: 'Least progress' },
+                      ] as const).map(opt => (
+                        <button key={opt.key}
+                          onClick={() => { setSortBy(opt.key); setSortOpen(false); }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-mono text-left transition-colors"
+                          style={{
+                            color: sortBy === opt.key ? '#38bdf8' : 'var(--text-secondary)',
+                            background: sortBy === opt.key ? 'rgba(56,189,248,0.07)' : 'transparent',
+                          }}
+                          onMouseEnter={e => { if (sortBy !== opt.key) (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'; }}
+                          onMouseLeave={e => { if (sortBy !== opt.key) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+                          {sortBy === opt.key && <span style={{ color: '#38bdf8', fontSize: 9 }}>✓</span>}
+                          {opt.label}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Clear all filters */}
+              <AnimatePresence>
+                {(filterStatus !== 'ALL' || sortBy !== 'default' || searchQuery) && (
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
+                    onClick={() => { setFilterStatus('ALL'); setSortBy('default'); setSearchQuery(''); }}
+                    whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+                    className="w-5 h-5 flex items-center justify-center rounded-full"
+                    style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}
+                    title="Clear all filters">
+                    <XIcon size={8} />
+                  </motion.button>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
         </motion.div>
 
         {loading ? (
@@ -725,13 +838,24 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
             <Zap size={32} className="text-green-500 opacity-40" />
             <p className="text-sm font-mono">No active tasks. Add one via the entry bar above.</p>
           </motion.div>
+        ) : displayedTasks.length === 0 ? (
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            className="mt-8 flex flex-col items-center gap-3 py-10" style={{ color: 'var(--text-faint)' }}>
+            <SlidersHorizontal size={24} style={{ opacity: 0.35 }} />
+            <p className="text-sm font-mono">No tasks match the current filter.</p>
+            <button onClick={() => { setFilterStatus('ALL'); setSortBy('default'); setSearchQuery(''); }}
+              className="text-xs font-mono px-3 py-1.5 rounded-lg"
+              style={{ background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.2)', color: '#38bdf8' }}>
+              Clear filters
+            </button>
+          </motion.div>
         ) : (
           <div
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4"
             onDragOver={(e) => e.preventDefault()}
           >
             <AnimatePresence>
-              {activeTasks.map((task, idx) => (
+              {displayedTasks.map((task, idx) => (
                 <DraggableTaskCard
                   key={task.id}
                   task={task}
@@ -880,30 +1004,6 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* OmniBar — CMD+K command palette */}
-      <OmniBar
-        isOpen={omniBarOpen}
-        onClose={() => { setOmniBarOpen(false); setOmniInitialValue(undefined); }}
-        initialValue={omniInitialValue}
-        onActionComplete={(intent, taskId, result) => {
-          // Refresh tasks after any action that might have changed them
-          const actionsNeedingRefresh = ['create_task', 'run_triage', 'panic_mode', 'negotiate', 'rebalance', 'smart_routing'];
-          if (actionsNeedingRefresh.includes(intent)) {
-            // Re-fetch tasks from the backend to pick up changes
-            loadTasks().catch(() => {});
-          }
-          // For smart_routing, also highlight the top task if returned
-          if (intent === 'smart_routing' && result?.topTask) {
-            const top = result.topTask as { id?: string; taskName?: string };
-            if (top?.taskName) {
-              addToast({ type: 'info', message: `Top priority: ${top.taskName.slice(0, 40)}`, duration: 5000 });
-            }
-          }
-        }}
-        isDark={isDark}
-        tasks={activeTasks}
-      />
 
       {/* Guided tour — replaced by ContextualHints in AppShell (non-blocking, page-aware) */}
 

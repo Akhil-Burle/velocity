@@ -7,7 +7,7 @@
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
-import { ArrowRight, Zap, CheckCircle2, ChevronDown, Activity, Gauge, Bot, ShieldAlert } from 'lucide-react';
+import { ArrowRight, Zap, CheckCircle2, ChevronDown, Activity, Gauge, Bot, ShieldAlert, Brain, Sparkles } from 'lucide-react';
 import { useIsDark, pal } from './_landingShared';
 
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:3001/api';
@@ -233,10 +233,12 @@ const FloatingMetric: React.FC<{
 
 // ── Capability rail (replaces the old task bar; fills the space, calm + premium) ─
 const CAPS = [
-  { icon: Activity, color: '#22c55e', label: 'Behavioral Velocity' },
-  { icon: Gauge, color: '#f59e0b', label: 'Deadline Physics' },
-  { icon: Bot, color: '#38bdf8', label: 'Autonomous Agent' },
+  { icon: Activity,    color: '#22c55e', label: 'Behavioral Velocity' },
+  { icon: Gauge,       color: '#f59e0b', label: 'Deadline Physics' },
+  { icon: Brain,       color: '#a78bfa', label: 'Brain Dump Engine' },
+  { icon: Bot,         color: '#38bdf8', label: 'Autonomous Agent' },
   { icon: ShieldAlert, color: '#ef4444', label: 'Panic Rescue' },
+  { icon: Sparkles,    color: '#f59e0b', label: 'Adaptive Learning' },
 ];
 
 const CapabilityRail: React.FC<{ reducedMotion: boolean; isDark: boolean }> = ({ reducedMotion, isDark }) => {
@@ -311,17 +313,17 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onEnterDemo, onSeeHowItWorks,
       {/* Atmosphere */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         {/* Top green glow */}
-        <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse 80% 60% at 50% -10%, rgba(34,197,94,${isDark ? 0.18 : 0.1}) 0%, transparent 70%)` }} />
+        <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse 80% 60% at 50% -10%, rgba(34,197,94,${isDark ? 0.3 : 0.1}) 0%, transparent 70%)` }} />
         {/* Bottom-right blue glow */}
-        <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse 60% 40% at 85% 70%, rgba(56,189,248,${isDark ? 0.08 : 0.07}) 0%, transparent 60%)` }} />
+        <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse 60% 40% at 85% 70%, rgba(56,189,248,${isDark ? 0.12 : 0.07}) 0%, transparent 60%)` }} />
 
         {/* Mouse-tracking orb */}
         {!reducedMotion && (
           <motion.div className="absolute w-[600px] h-[600px] rounded-full pointer-events-none"
-            style={{ x: orbX, y: orbY, background: `radial-gradient(circle, rgba(34,197,94,${isDark ? 0.1 : 0.1}) 0%, transparent 70%)`, filter: 'blur(40px)' }} />
+            style={{ x: orbX, y: orbY, background: `radial-gradient(circle, rgba(34,197,94,${isDark ? 0.2 : 0.1}) 0%, transparent 70%)`, filter: 'blur(40px)' }} />
         )}
 
-        {/* Grid lines — more visible in dark mode */}
+        {/* Grid lines */}
         <div className="absolute inset-0" style={{
           backgroundImage: `linear-gradient(${isDark ? 'rgba(34,197,94,0.07)' : 'rgba(15,23,42,0.04)'} 1px, transparent 1px), linear-gradient(90deg, ${isDark ? 'rgba(34,197,94,0.07)' : 'rgba(15,23,42,0.04)'} 1px, transparent 1px)`,
           backgroundSize: '64px 64px',
@@ -329,36 +331,8 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onEnterDemo, onSeeHowItWorks,
           WebkitMaskImage: 'radial-gradient(ellipse 85% 85% at 50% 50%, black 30%, transparent 100%)',
         }} />
 
-        {/* Dark mode: animated green sweep across grid */}
-        {isDark && !reducedMotion && (
-          <motion.div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              backgroundImage: 'linear-gradient(180deg, transparent 0%, rgba(34,197,94,0.06) 50%, transparent 100%)',
-              backgroundSize: '100% 320px',
-            }}
-            animate={{ backgroundPositionY: ['0px', '100vh'] }}
-            transition={{ duration: 5, repeat: Infinity, ease: 'linear' }}
-          />
-        )}
-
-        {/* Dark mode: secondary horizontal shimmer on grid */}
-        {isDark && !reducedMotion && (
-          <motion.div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              backgroundImage: 'linear-gradient(90deg, transparent 0%, rgba(34,197,94,0.04) 50%, transparent 100%)',
-              backgroundSize: '320px 100%',
-            }}
-            animate={{ backgroundPositionX: ['-320px', '100vw'] }}
-            transition={{ duration: 8, repeat: Infinity, ease: 'linear', delay: 2 }}
-          />
-        )}
-
-        {/* Light mode: existing warm glow accent */}
-        {!isDark && (
-          <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 50% 40% at 50% 100%, rgba(34,197,94,0.05) 0%, transparent 70%)' }} />
-        )}
+        {/* Bottom warm glow accent — both modes */}
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 50% 40% at 50% 100%, rgba(34,197,94,0.05) 0%, transparent 70%)' }} />
       </div>
 
       <ParticleCanvas reducedMotion={reducedMotion} isDark={isDark} />
@@ -378,7 +352,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onEnterDemo, onSeeHowItWorks,
               style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', color: isDark ? '#4ade80' : '#15803d' }}>
               <motion.span className="w-1.5 h-1.5 rounded-full bg-green-400"
                 animate={{ opacity: [1, 0.2, 1], scale: [1, 0.8, 1] }} transition={{ duration: 1.4, repeat: Infinity }} />
-              Google AI Hackathon 2026 · Behavioral Velocity Engine
+              AI-Powered Productivity · Beat Every Deadline
             </span>
           </motion.div>
 

@@ -320,7 +320,7 @@ const VelocityVectorPage: React.FC = () => {
             whileHover={!loading ? { scale: 1.08 } : {}}
             whileTap={!loading ? { scale: 0.92 } : {}}
             className="w-8 h-8 flex items-center justify-center rounded-lg"
-            style={{ background: 'rgba(34,197,94,0.08)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.2)', opacity: loading ? 0.7 : 1 }}>
+            style={{ background: 'rgba(34,197,94,0.08)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.32)', opacity: loading ? 0.7 : 1, boxShadow: '0 0 0 1px rgba(34,197,94,0.12), 0 0 10px rgba(34,197,94,0.1)' }}>
             <RefreshCw size={13} />
           </motion.button>
         </div>

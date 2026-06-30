@@ -19,9 +19,9 @@ import { fetchActiveReminders, computeDriftScoreBatch, VelocityVector as Velocit
 import { Reminder } from '../types';
 import CreditsTicker from './CreditsTicker';
 import VelocityVectorIndicator from './VelocityVector';
-import ContextualHints from './ContextualHints';
-import TourReOpenButton from './TourReOpenButton';
 import OmniBar from './OmniBar';
+import { useTour, TOUR_HIGHLIGHTS } from './TourContext';
+import TourReOpenButton from './TourReOpenButton';
 
 // Detect OS for keyboard shortcut label
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
@@ -212,27 +212,46 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { markSeen } = useTour();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : false);
   const [velocityVector, setVelocityVector] = useState<VelocityVectorType | null>(null);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
 
+  // ── Auto-mark tour highlights as seen when judge visits the matching route ─
+  // Small delay so the page has time to render before we tick it off.
+  // manualOnly items are skipped — they need an explicit trigger action.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      TOUR_HIGHLIGHTS.forEach(h => {
+        if (h.route === location.pathname && !h.manualOnly) markSeen(h.id);
+      });
+    }, 800);
+    return () => clearTimeout(t);
+  }, [location.pathname, markSeen]);
+
   // ── Global OmniBar state ─────────────────────────────────────────────────
   const [omniBarOpen, setOmniBarOpen] = useState(false);
   const [omniInitialValue, setOmniInitialValue] = useState<string | undefined>(undefined);
 
-  // ── Global Ctrl/Cmd+K shortcut ───────────────────────────────────────────
+  // ── Global Ctrl/Cmd+K shortcut + open-omnibar event ────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         setOmniBarOpen(true);
+        markSeen('omnibar');
       }
     };
+    const eventHandler = () => { setOmniBarOpen(true); markSeen('omnibar'); };
     document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, []);
+    window.addEventListener('velocity:open-omnibar', eventHandler);
+    return () => {
+      document.removeEventListener('keydown', handler);
+      window.removeEventListener('velocity:open-omnibar', eventHandler);
+    };
+  }, [markSeen]);
 
   // ── Pick up task description carried over from the landing hero ──────────
   // When a visitor types in the landing hero task bar, it's stored in
@@ -484,22 +503,23 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
               />
             )}
 
-            {/* Tour re-open button — shows when Start Here card is dismissed */}
-            <TourReOpenButton surfaceBorder={surfaceBorder} />
-
             {/* Velocity Credits ticker — persistent across all pages */}
             <CreditsTicker isDark={isDark} surfaceBorder={surfaceBorder} />
 
+            {/* Tour button — shows on non-dashboard pages, disappears at 12/12 */}
+            <TourReOpenButton surfaceBorder={surfaceBorder} />
+
             {/* ⌘K / Ctrl+K OmniBar pill — visible on all pages */}
             <motion.button
-              onClick={() => setOmniBarOpen(true)}
-              whileHover={{ scale: 1.05, boxShadow: '0 0 12px rgba(34,197,94,0.25)' }}
+              onClick={() => { setOmniBarOpen(true); markSeen('omnibar'); }}
+              whileHover={{ scale: 1.05, boxShadow: '0 0 16px rgba(34,197,94,0.4)' }}
               whileTap={{ scale: 0.95 }}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-mono font-semibold"
               style={{
-                background: 'rgba(34,197,94,0.08)',
+                background: 'rgba(34,197,94,0.1)',
                 color: '#4ade80',
-                border: '1px solid rgba(34,197,94,0.22)',
+                border: '1px solid rgba(34,197,94,0.4)',
+                boxShadow: '0 0 0 1px rgba(34,197,94,0.15), 0 0 10px rgba(34,197,94,0.12)',
               }}
               title={`Open command palette (${KBD_LABEL})`}
             >
@@ -570,9 +590,6 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
           {children}
         </main>
       </div>
-
-      {/* Contextual hints — page-aware, non-blocking, shares state with StartHereCard */}
-      <ContextualHints />
 
       {/* Global OmniBar — accessible via Ctrl/Cmd+K on every page */}
       <OmniBar

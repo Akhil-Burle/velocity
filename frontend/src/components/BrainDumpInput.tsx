@@ -255,7 +255,8 @@ const BrainDumpInput = forwardRef<BrainDumpInputHandle, BrainDumpInputProps>(({
                   ? 'linear-gradient(135deg,#22c55e,#16a34a)'
                   : isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
                 color: value.trim() && !loading ? '#000' : 'var(--text-faint)',
-                boxShadow: value.trim() && !loading ? '0 0 20px rgba(34,197,94,0.25)' : 'none',
+                boxShadow: value.trim() && !loading ? '0 0 0 1px rgba(34,197,94,0.3), 0 0 20px rgba(34,197,94,0.3)' : 'none',
+                border: value.trim() && !loading ? '1px solid rgba(34,197,94,0.5)' : '1px solid transparent',
               }}
             >
               {loading ? (

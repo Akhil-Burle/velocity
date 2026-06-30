@@ -367,7 +367,7 @@ const InsightsPage: React.FC = () => {
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold"
             style={briefingLoading
               ? { background: surfaceBg, color: 'var(--text-faint)', border: `1px solid ${surfaceBorder}`, opacity: 0.5 }
-              : { background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.22)' }}>
+              : { background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.32)', boxShadow: '0 0 0 1px rgba(34,197,94,0.12), 0 0 12px rgba(34,197,94,0.1)' }}>
             {briefingLoading
               ? <motion.div className="w-3 h-3 rounded-full border-2 border-green-400 border-t-transparent" animate={{ rotate: 360 }} transition={{ duration: 0.7, repeat: Infinity }} />
               : <Cpu size={12} />}

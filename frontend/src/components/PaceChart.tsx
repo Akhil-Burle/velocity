@@ -60,14 +60,23 @@ function buildChartData(task: Task, m: PaceMetrics) {
   const projFinish = m.projectedFinish ? new Date(m.projectedFinish).getTime() : null;
   let projMs: number | null = null;
   if (projFinish && m.actual < 100) {
-    projMs = Math.min(projFinish, deadline + span * 0.5);
-    rows.push({ t: projMs, expected: null, actual: null, projected: 100, fill: null });
+    // Don't cap at deadline — let it extend past so a late projection is visible
+    // Only suppress if absurdly far out (>90 days from now), which means no real signal
+    const daysOut = (projFinish - now) / DAY;
+    if (daysOut < 90) {
+      projMs = projFinish;
+      rows.push({ t: projMs, expected: null, actual: null, projected: 100, fill: null });
+    }
   }
 
+  // Always include the deadline point
   rows.push({ t: deadline, expected: 100, actual: null, projected: null, fill: null });
+
+  // If projection is past the deadline, extend the chart to show it
+  const chartEnd = projMs && projMs > deadline ? projMs + (projMs - deadline) * 0.15 : deadline;
   rows.sort((a, b) => a.t - b.t);
 
-  return { data: rows, deadlineMs: deadline, nowMs: now, projectedMs: projMs };
+  return { data: rows, deadlineMs: deadline, nowMs: now, projectedMs: projMs, chartEnd };
 }
 
 // ── Finish probability arc (SVG) ──────────────────────────────────────────────
@@ -220,7 +229,7 @@ const PaceChart: React.FC<PaceChartProps> = ({ task, isDark = true, compact = fa
   const m = metrics ?? computePaceMetrics(task);
   const accent = STATUS_COLOR[m.status] || '#22c55e';
 
-  const { data, deadlineMs, nowMs, projectedMs } = useMemo(
+  const { data, deadlineMs, nowMs, projectedMs, chartEnd } = useMemo(
     () => buildChartData(task, m),
     [task, m]
   );
@@ -347,7 +356,7 @@ const PaceChart: React.FC<PaceChartProps> = ({ task, isDark = true, compact = fa
       {/* ── Chart ────────────────────────────────────────────────────────── */}
       <div style={{ width: '100%', height: 190 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -22 }}>
+          <ComposedChart data={data} margin={{ top: 8, right: 72, bottom: 0, left: -22 }}>
             <defs>
               <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={accent} stopOpacity={0.3} />
@@ -366,10 +375,10 @@ const PaceChart: React.FC<PaceChartProps> = ({ task, isDark = true, compact = fa
 
             <CartesianGrid horizontal vertical={false} stroke={gridColor} strokeDasharray="2 4" />
 
-            {/* Miss zone — past deadline red shading */}
+            {/* Miss zone — shaded area past deadline when projection overshoots */}
             {projectedMs && projectedMs > deadlineMs && (
               <ReferenceArea x1={deadlineMs} x2={projectedMs}
-                fill="rgba(239,68,68,0.06)" strokeWidth={0} />
+                fill="rgba(239,68,68,0.07)" strokeWidth={0} />
             )}
 
             {/* Deadline line */}
@@ -378,6 +387,21 @@ const PaceChart: React.FC<PaceChartProps> = ({ task, isDark = true, compact = fa
               label={{ value: 'deadline', position: 'insideTopLeft',
                 fill: '#f87171', fontSize: 8, fontFamily: 'JetBrains Mono, monospace' }} />
 
+            {/* Projected finish line — only when meaningfully different from deadline */}
+            {projectedMs && Math.abs(projectedMs - deadlineMs) > DAY * 0.5 && (
+              <ReferenceLine x={projectedMs}
+                stroke={projectedMs > deadlineMs ? 'rgba(239,68,68,0.6)' : 'rgba(34,197,94,0.6)'}
+                strokeDasharray="4 3" strokeWidth={1.5}
+                label={{
+                  value: `proj. ${new Date(projectedMs).toLocaleDateString('en', { month: 'short', day: 'numeric' })}`,
+                  position: projectedMs > deadlineMs ? 'insideTopLeft' : 'insideTopRight',
+                  fill: projectedMs > deadlineMs ? '#f87171' : '#4ade80',
+                  fontSize: 8,
+                  fontFamily: 'JetBrains Mono, monospace',
+                  dx: projectedMs > deadlineMs ? 4 : -4,
+                }} />
+            )}
+
             {/* Now line */}
             <ReferenceLine x={nowMs}
               stroke={isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.18)'}
@@ -385,7 +409,7 @@ const PaceChart: React.FC<PaceChartProps> = ({ task, isDark = true, compact = fa
               label={{ value: 'now', position: 'insideTopRight',
                 fill: 'var(--text-faint)', fontSize: 8, fontFamily: 'JetBrains Mono, monospace' }} />
 
-            <XAxis dataKey="t" type="number" domain={['dataMin', 'dataMax']}
+            <XAxis dataKey="t" type="number" domain={['dataMin', chartEnd]}
               tickFormatter={fmtDate} tickLine={false} axisLine={false}
               tick={{ fill: 'var(--text-faint)', fontSize: 9, fontFamily: 'JetBrains Mono, monospace' }} />
             <YAxis domain={[0, 100]} tickLine={false} axisLine={false}
@@ -435,7 +459,13 @@ const PaceChart: React.FC<PaceChartProps> = ({ task, isDark = true, compact = fa
       <div className="flex items-center gap-4 justify-center">
         <LegendItem color={accent} label="Actual" />
         <LegendItem color={expectedColor} label="Expected" dashed />
-        {projectedMs && <LegendItem color={accent} label="Projected" dashed />}
+        {projectedMs && (
+          <LegendItem
+            color={projectedMs > deadlineMs ? '#ef4444' : accent}
+            label={`Proj. finish ${new Date(projectedMs).toLocaleDateString('en', { month: 'short', day: 'numeric' })}`}
+            dashed
+          />
+        )}
       </div>
     </div>
   );

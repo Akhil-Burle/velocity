@@ -314,9 +314,19 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   const prob = pace.finishProbability ?? 50;
   const probColor = prob >= 70 ? '#22c55e' : prob >= 45 ? '#f59e0b' : '#ef4444';
-  const projFinishLabel = pace.projectedFinish
-    ? new Date(pace.projectedFinish).toLocaleDateString([], { month: 'short', day: 'numeric' })
-    : '—';
+
+  // Only show projected finish if it's a meaningful near-term date:
+  // - must exist, be in the future, and be within 60 days
+  // - if velocity is ~0 the projection will be absurdly far out — suppress it
+  const projFinishLabel = (() => {
+    if (!pace.projectedFinish) return '—';
+    const projMs = new Date(pace.projectedFinish).getTime();
+    const now = Date.now();
+    const daysOut = (projMs - now) / 86400000;
+    if (daysOut < 0) return 'overdue';
+    if (daysOut > 60) return '—'; // too far out to be useful
+    return new Date(pace.projectedFinish).toLocaleDateString([], { month: 'short', day: 'numeric' });
+  })();
 
   const modalBg = isDark ? 'linear-gradient(135deg,#141b23 0%,#0f1419 100%)' : 'linear-gradient(135deg,#ffffff 0%,#f8fafc 100%)';
   const dividerColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)';
@@ -423,7 +433,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             <StatCard isDark={isDark} icon={<Gauge size={13} />} label="Required Pace" color={cfg.accent}
               value={isComplete ? '—' : fmtHours(pace.requiredHoursPerDay)} sub="focus per day" />
             <StatCard isDark={isDark} icon={<Hourglass size={13} />} label="Time Left" color={daysLeft < 1 ? '#ef4444' : daysLeft < 2 ? '#f59e0b' : '#22c55e'}
-              value={timeLeftLabel} sub={`projected finish ${projFinishLabel}`} />
+              value={timeLeftLabel} sub={projFinishLabel !== '—' ? `proj. finish ${projFinishLabel}` : 'to deadline'} />
             <StatCard isDark={isDark} icon={<Flag size={13} />} label="On-Time Odds" color={probColor}
               value={`${prob}%`} sub={pace.willFinishOnTime ? 'on track' : 'at risk'} />
           </div>

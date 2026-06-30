@@ -9,7 +9,7 @@ import { Reveal, Eyebrow, glass, TiltCard, useIsDark, pal } from './_landingShar
 interface Tech { color: string; name: string; badge: string; what: string; url: string; }
 
 const TECHS: Tech[] = [
-  { color: '#4285f4', name: 'Vertex AI · Gemini 2.0 Flash', badge: 'AI Core', what: 'Every AI decision — Brain Dump, Panic Mode, Negotiate, Ultimatum, Omni-Bar, Day Rebalance — routes through Vertex AI.', url: 'https://cloud.google.com/vertex-ai' },
+  { color: '#4285f4', name: 'Vertex AI · Gemini 3.1 Flash Lite', badge: 'AI Core', what: 'Every AI decision — Brain Dump, Panic Mode, Negotiate, Ultimatum, Omni-Bar, Day Rebalance — routes through Vertex AI.', url: 'https://cloud.google.com/vertex-ai' },
   { color: '#4285f4', name: 'Gemini Vision (multimodal)', badge: 'AI Vision', what: 'Chaos Scanner: drop a whiteboard photo and Gemini Vision extracts structured tasks with deadlines.', url: 'https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/overview' },
   { color: '#34a853', name: 'Google Calendar API', badge: 'Workspace', what: 'Reads real events from your account. Command Day and Rebalance schedule around actual meetings.', url: 'https://developers.google.com/calendar' },
   { color: '#fbbc04', name: 'Google Sign-In (OAuth 2.0)', badge: 'Identity', what: 'A real OAuth 2.0 consent flow: signs in, creates the user, issues a JWT, and unlocks Calendar access.', url: 'https://developers.google.com/identity' },
@@ -25,11 +25,7 @@ const GoogleCloudSection: React.FC<{ reducedMotion: boolean }> = ({ reducedMotio
       style={{ background: `radial-gradient(ellipse 60% 40% at 50% 45%, rgba(66,133,244,${isDark ? 0.045 : 0.05}) 0%, transparent 70%)` }}>
       <div className="max-w-5xl mx-auto">
         <Reveal variant="blur" reducedMotion={reducedMotion} className="mb-12 max-w-xl">
-          <div className="flex items-center gap-2.5 mb-5">
-            {['#4285f4', '#ea4335', '#fbbc04', '#34a853'].map((c) => <div key={c} className="w-3 h-3 rounded-full" style={{ background: c }} />)}
-            <Eyebrow>Built natively on Google Cloud</Eyebrow>
-          </div>
-          <h2 style={{ fontSize: 'clamp(2rem, 4.2vw, 3.2rem)', fontWeight: 800, letterSpacing: '-0.03em', marginBottom: 14, color: p.text }}>
+          <h2 style={{ fontSize: 'clamp(1.5rem, 3vw, 3.2rem)', fontWeight: 800, letterSpacing: '-0.03em', marginBottom: 14, color: p.text, whiteSpace: 'nowrap' }}>
             Every API is live and wired in
           </h2>
           <p className="text-base" style={{ color: p.textMute }}>
@@ -50,7 +46,12 @@ const GoogleCloudSection: React.FC<{ reducedMotion: boolean }> = ({ reducedMotio
                     {tech.badge}
                   </span>
                 </div>
-                <div className="text-xs font-bold mb-1.5" style={{ color: p.text }}>{tech.name}</div>
+                <div className="text-xs font-bold mb-1.5" style={{ color: p.text }}>
+                  {tech.name}
+                  {tech.name === 'Google Sign-In (OAuth 2.0)' && (
+                    <span className="ml-1.5 text-[9px] font-mono font-normal" style={{ color: p.textFaint }}>*test mode only</span>
+                  )}
+                </div>
                 <p className="text-[10px] font-mono leading-relaxed mb-3" style={{ color: p.textFaint }}>{tech.what}</p>
                 <a href={tech.url} target="_blank" rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-[10px] font-mono" style={{ color: tech.color }}>

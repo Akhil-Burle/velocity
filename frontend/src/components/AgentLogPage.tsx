@@ -186,11 +186,22 @@ const LogCard: React.FC<{
   surfaceBg: string;
   surfaceBorder: string;
   divider: string;
+  autoExpand?: boolean;
   onUndo: (id: string) => void;
   onUndoStep: (id: string, stepNumber: number) => void;
-}> = ({ entry, idx, isDark, surfaceBg, surfaceBorder, divider, onUndo, onUndoStep }) => {
-  const [expanded, setExpanded] = useState(false);
+}> = ({ entry, idx, isDark, surfaceBg, surfaceBorder, divider, autoExpand, onUndo, onUndoStep }) => {
+  const [expanded, setExpanded] = useState(autoExpand ?? false);
   const [undoing, setUndoing] = useState(false);
+  const cardRef = React.useRef<HTMLDivElement>(null);
+
+  // Scroll the auto-expanded entry into view after the page settles
+  React.useEffect(() => {
+    if (!autoExpand || !cardRef.current) return;
+    const t = setTimeout(() => {
+      cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 500); // wait for page + animation to render
+    return () => clearTimeout(t);
+  }, [autoExpand]);
 
   const feat = FEATURE_META[entry.featureKey] || { label: entry.featureKey, color: '#94a3b8', icon: <Bot size={11} /> };
   const auto = AUTONOMY_META[entry.autonomy] || AUTONOMY_META.assisted;
@@ -255,6 +266,7 @@ const LogCard: React.FC<{
 
   return (
     <motion.div
+      ref={cardRef}
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0, marginBottom: 0 }}
@@ -583,6 +595,7 @@ const AgentLogPage: React.FC = () => {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
   const [filterKey, setFilterKey] = useState<string | null>(null);
+  const [autoExpandFeature, setAutoExpandFeature] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
   // Phase 4: deep-link from Start Here card
@@ -591,6 +604,15 @@ const AgentLogPage: React.FC = () => {
     if (hint === 'memory') { sessionStorage.removeItem('agent_log_tab'); return 'memory'; }
     return 'log';
   });
+
+  // Deep-link: auto-expand first entry matching a featureKey
+  useEffect(() => {
+    const expandHint = sessionStorage.getItem('agent_log_expand');
+    if (expandHint) {
+      sessionStorage.removeItem('agent_log_expand');
+      setAutoExpandFeature(expandHint);
+    }
+  }, []);
 
   const surfaceBg     = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.85)';
   const surfaceBorder = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)';
@@ -804,6 +826,7 @@ const AgentLogPage: React.FC = () => {
                 {paginated.map((entry, i) => (
                   <LogCard key={entry.id} entry={entry} idx={i} isDark={isDark}
                     surfaceBg={surfaceBg} surfaceBorder={surfaceBorder} divider={divider}
+                    autoExpand={autoExpandFeature !== null && entry.featureKey === autoExpandFeature && paginated.findIndex(e => e.featureKey === autoExpandFeature) === i}
                     onUndo={handleUndo} onUndoStep={handleUndoStep} />
                 ))}
               </AnimatePresence>

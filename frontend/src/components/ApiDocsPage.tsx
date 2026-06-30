@@ -1106,7 +1106,7 @@ const ApiDocsPage: React.FC = () => {
                 ? '…'
                 : health
                   ? (health.aiBackend === 'vertex_ai' ? 'Vertex AI' : 'Gemini API')
-                  : 'Gemini 2.0 Flash',
+                  : 'Gemini 3.1 Flash Lite',
               color: '#4285f4',
               live: !!health,
             },
@@ -1129,7 +1129,7 @@ const ApiDocsPage: React.FC = () => {
               </div>
               {label === 'AI Backend' && health && (
                 <span className="text-[9px] font-mono" style={{ color: 'var(--text-faint)' }}>
-                  {health.aiModel || 'gemini-2.0-flash'}
+                  {health.aiModel || 'gemini-3.1-flash-lite'}
                 </span>
               )}
               {label === 'AI Backend' && health?.vertexProject && (
@@ -1273,7 +1273,7 @@ const ApiDocsPage: React.FC = () => {
         style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', border: `1px solid ${divider}` }}
       >
         <span className="text-[10px] font-mono" style={{ color: 'var(--text-faint)' }}>
-          Velocity API · Node.js 20 + Express · MongoDB Atlas · Vertex AI (Gemini 2.0 Flash) · {TOTAL_ENDPOINTS} endpoints across {TOTAL_GROUPS} groups
+          Velocity API · Node.js 20 + Express · MongoDB Atlas · Vertex AI (Gemini 3.1 Flash Lite) · {TOTAL_ENDPOINTS} endpoints across {TOTAL_GROUPS} groups
         </span>
       </motion.div>
     </div>

@@ -68,7 +68,7 @@ const LandingPage: React.FC = () => {
         {/* Footer */}
         <div className="relative z-10 text-center py-8 px-5" style={{ borderTop: `1px solid ${p.hairline}` }}>
           <p className="text-[11px] font-mono" style={{ color: p.textDim }}>
-            Velocity · Built for Google AI Hackathon 2026 · All Google API calls are live in the demo
+            Velocity · Built for Vibe2Ship 2026 · All API calls are live in the demo
           </p>
         </div>
       </div>

@@ -18,24 +18,32 @@
  */
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Zap, Bot, ShieldAlert, Layers, X, ChevronRight, Activity,
-  FlaskConical, TrendingDown, Calendar, CheckCircle2,
+  FlaskConical, TrendingDown, Calendar, CheckCircle2, Gauge, Cpu, Target, FileCode,
+  GitBranch, AlertTriangle, TrendingUp,
 } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
 import { useTour, TOUR_HIGHLIGHTS } from './TourContext';
 
 // ─── Icon map ─────────────────────────────────────────────────────────────────
 const ICON_MAP: Record<string, React.ReactNode> = {
-  'bot':          <Bot size={12} />,
-  'trending-down':<TrendingDown size={12} />,
-  'activity':     <Activity size={12} />,
-  'shield-alert': <ShieldAlert size={12} />,
-  'zap':          <Zap size={12} />,
-  'calendar':     <Calendar size={12} />,
-  'flask':        <FlaskConical size={12} />,
-  'layers':       <Layers size={12} />,
+  'bot':            <Bot size={12} />,
+  'trending-down':  <TrendingDown size={12} />,
+  'trending-up':    <TrendingUp size={12} />,
+  'activity':       <Activity size={12} />,
+  'shield-alert':   <ShieldAlert size={12} />,
+  'zap':            <Zap size={12} />,
+  'calendar':       <Calendar size={12} />,
+  'flask':          <FlaskConical size={12} />,
+  'layers':         <Layers size={12} />,
+  'gauge':          <Gauge size={12} />,
+  'cpu':            <Cpu size={12} />,
+  'target':         <Target size={12} />,
+  'file-code':      <FileCode size={12} />,
+  'git-branch':     <GitBranch size={12} />,
+  'alert-triangle': <AlertTriangle size={12} />,
 };
 
 interface StartHereCardProps {
@@ -47,9 +55,14 @@ const StartHereCard: React.FC<StartHereCardProps> = ({ onTriggerPanic }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const navigate = useNavigate();
+  const location = useLocation();
   const { cardVisible, dismissCard, seenIds, seenCount, totalCount, markSeen } = useTour();
   const [mounted, setMounted] = useState(false);
   const [expanded, setExpanded] = useState(false);
+
+  // Only show on dashboard, and hide when all done
+  const isOnDashboard = location.pathname === '/dashboard' || location.pathname === '/';
+  const allDone = seenCount >= totalCount;
 
   // Small delay before revealing so dashboard renders first
   useEffect(() => {
@@ -61,7 +74,7 @@ const StartHereCard: React.FC<StartHereCardProps> = ({ onTriggerPanic }) => {
     // Set a flag so ContextualHints shows this hint immediately on arrival
     sessionStorage.setItem('tour_navigate_hint', highlightId);
 
-    // Set optional deep-link key (e.g., agent_log_tab = memory)
+    // Set optional deep-link key (e.g., agent_log_tab = memory, agent_log_expand = chain)
     if (deepLinkKey && deepLinkValue) {
       sessionStorage.setItem(deepLinkKey, deepLinkValue);
     }
@@ -73,10 +86,28 @@ const StartHereCard: React.FC<StartHereCardProps> = ({ onTriggerPanic }) => {
       return;
     }
 
+    // Handle OmniBar — fire a global event to open it (AppShell listens)
+    if (highlightId === 'omnibar') {
+      window.dispatchEvent(new CustomEvent('velocity:open-omnibar'));
+      markSeen('omnibar');
+      return;
+    }
+
+    // Handle Ultimatum — fire event to trigger ultimatum on Dashboard
+    if (highlightId === 'ultimatum-engine') {
+      window.dispatchEvent(new CustomEvent('velocity:trigger-ultimatum'));
+      navigate('/dashboard');
+      return;
+    }
+
+    // For manualOnly items that navigate normally, mark them seen on click
+    const h = TOUR_HIGHLIGHTS.find(x => x.id === highlightId);
+    if (h?.manualOnly) markSeen(highlightId);
+
     navigate(linkTo);
   };
 
-  const visible = mounted && cardVisible;
+  const visible = mounted && cardVisible && isOnDashboard && !allDone;
 
   return (
     <AnimatePresence>
@@ -117,8 +148,7 @@ const StartHereCard: React.FC<StartHereCardProps> = ({ onTriggerPanic }) => {
                     Start here for judges
                   </span>
                   <span className="text-[10px] font-mono ml-2" style={{ color: 'var(--text-faint)' }}>
-                    {expanded ? '8 things that make this an agent, not a scheduler' : `${seenCount}/${totalCount} explored · click to expand`}
-                  </span>
+                    {expanded ? '12 things that make this an agent, not a scheduler' : `${seenCount}/${totalCount} explored · click to expand`}                  </span>
                 </div>
               </div>
 

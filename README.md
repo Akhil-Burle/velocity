@@ -9,7 +9,7 @@
 <br/>
 
 [![Live Demo](https://img.shields.io/badge/🚀_LIVE_DEMO-velocity--500511.web.app-22c55e?style=for-the-badge&labelColor=0a0a0f)](https://velocity-500511.web.app)
-[![Built With Gemini](https://img.shields.io/badge/Gemini_2.0_Flash-Vertex_AI-4285F4?style=for-the-badge&logo=google&logoColor=white&labelColor=0a0a0f)](https://velocity-500511.web.app)
+[![Built With Gemini](https://img.shields.io/badge/Gemini_3.1_Flash_Lite-Vertex_AI-4285F4?style=for-the-badge&logo=google&logoColor=white&labelColor=0a0a0f)](https://velocity-500511.web.app)
 [![Firebase](https://img.shields.io/badge/Firebase-Hosting-FFCA28?style=for-the-badge&logo=firebase&logoColor=black&labelColor=0a0a0f)](https://velocity-500511.web.app)
 [![Cloud Run](https://img.shields.io/badge/Google_Cloud-Run-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white&labelColor=0a0a0f)](https://velocity-500511.web.app)
 
@@ -228,7 +228,7 @@ Velocity earns the label through three specific, verifiable mechanisms:
 
 | Technology | Role in Velocity |
 |---|---|
-| **Gemini 2.0 Flash — Vertex AI** | Brain Dump extraction, Chaos Scanner vision, OmniBar intent classification, Panic Mode scaffold, Negotiate drafting, AI Rebalance, Morning Briefing, Ultimatum cost sentences, Behavioral Drift language signal |
+| **Gemini 3.1 Flash Lite — Vertex AI** | Brain Dump extraction, Chaos Scanner vision, OmniBar intent classification, Panic Mode scaffold, Negotiate drafting, AI Rebalance, Morning Briefing, Ultimatum cost sentences, Behavioral Drift language signal |
 | **Gemini Vision (multimodal)** | Chaos Scanner: structured tasks extracted from whiteboard or syllabus photos |
 | **Google Calendar API (OAuth2)** | Real calendar events block time in Command Day; Rebalance routes around them |
 | **Google Cloud TTS** | OmniBar voice output — AI responses synthesized as MP3 (`en-US-Journey-F`), streamed as base64 audio |
@@ -247,7 +247,7 @@ Velocity earns the label through three specific, verifiable mechanisms:
 |---|---|
 | **Frontend** | React 18 + TypeScript · Vite · Tailwind CSS · Framer Motion · Recharts |
 | **Backend** | Node.js + Express · MongoDB Atlas + Mongoose · JWT auth |
-| **AI** | Gemini 2.0 Flash via Vertex AI (prod) / Gemini Developer API (dev) — unified `@google/genai` SDK |
+| **AI** | Gemini 3.1 Flash Lite via Vertex AI (prod) / Gemini Developer API (dev) — unified `@google/genai` SDK |
 | **Hosting** | Firebase Hosting (frontend) + Google Cloud Run (backend) |
 | **External APIs** | Google Calendar API · Google Cloud TTS · GitHub API (Panic Mode repo creation) |
 

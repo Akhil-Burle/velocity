@@ -19,6 +19,7 @@ interface BurnoutChartProps {
   tasks: Task[];
   isDark?: boolean;
   onTriggerTriage: () => void;
+  onExpand?: () => void;
 }
 
 interface BurnoutDataPoint {
@@ -54,7 +55,7 @@ function buildBurnoutData(tasks: Task[]): BurnoutDataPoint[] {
   });
 }
 
-const BurnoutChart: React.FC<BurnoutChartProps> = ({ tasks, isDark = true, onTriggerTriage }) => {
+const BurnoutChart: React.FC<BurnoutChartProps> = ({ tasks, isDark = true, onTriggerTriage, onExpand }) => {
   const [expanded, setExpanded] = useState(false);
   const data = useMemo(() => buildBurnoutData(tasks), [tasks]);
   const isBurningToday = data[0]?.burnout ?? false;
@@ -112,7 +113,7 @@ const BurnoutChart: React.FC<BurnoutChartProps> = ({ tasks, isDark = true, onTri
     >
       {/* ── Collapsed header — always visible ─────────────────────────── */}
       <div
-        onClick={() => setExpanded(v => !v)}
+        onClick={() => { if (!expanded) onExpand?.(); setExpanded(v => !v); }}
         className="w-full flex items-center justify-between px-4 py-2.5 gap-3 cursor-pointer"
       >
         <div className="flex items-center gap-2 min-w-0">
@@ -141,7 +142,7 @@ const BurnoutChart: React.FC<BurnoutChartProps> = ({ tasks, isDark = true, onTri
               onClick={e => { e.stopPropagation(); onTriggerTriage(); }}
               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
               className="text-[10px] font-semibold px-2.5 py-1 rounded-lg font-mono"
-              style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.3)' }}
+              style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.35)', boxShadow: '0 0 0 1px rgba(245,158,11,0.15), 0 0 10px rgba(245,158,11,0.12)' }}
             >
               Triage
             </motion.button>
@@ -216,7 +217,7 @@ const BurnoutChart: React.FC<BurnoutChartProps> = ({ tasks, isDark = true, onTri
                   <motion.button onClick={onTriggerTriage}
                     whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                     className="shrink-0 text-[11px] font-semibold px-3 py-1.5 rounded-lg font-mono whitespace-nowrap"
-                    style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.3)' }}>
+                    style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.35)', boxShadow: '0 0 0 1px rgba(245,158,11,0.15), 0 0 10px rgba(245,158,11,0.12)' }}>
                     Run Triage
                   </motion.button>
                 </motion.div>

@@ -274,7 +274,7 @@ const GoalsPage: React.FC = () => {
             <motion.button onClick={() => setShowCreateGoal(true)}
               whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
-              style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.22)' }}>
+            style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.35)', boxShadow: '0 0 0 1px rgba(34,197,94,0.15), 0 0 10px rgba(34,197,94,0.1)' }}>
               <Plus size={12} />New Goal
             </motion.button>
           </div>

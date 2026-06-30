@@ -53,45 +53,56 @@ function hasEnoughSignal(task) {
   return completedSubtasks > 0 || checkInCount > 0 || panicUsed;
 }
 
-// ─── Signal a: subtask completion ratio ─────────────────────────────────────
-// Returns 0–100 inferred progress based solely on subtask ticks.
+// ─── Signal a: subtask completion ratio (weighted by estimatedMinutes) ──────
+// Returns 0–100 inferred progress based on effort-weighted subtask ticks.
+// A 90-min subtask ticked counts far more than a 5-min one.
 // Returns null if the task has no subtasks.
 function subtaskSignal(task) {
   const subtasks = task.subtasks || [];
   if (subtasks.length === 0) return null;
-  return Math.round((subtasks.filter(s => s.completed).length / subtasks.length) * 100);
+
+  const totalMins     = subtasks.reduce((s, sub) => s + (sub.estimatedMinutes || 30), 0);
+  const completedMins = subtasks.filter(s => s.completed).reduce((s, sub) => s + (sub.estimatedMinutes || 30), 0);
+
+  if (totalMins === 0) {
+    // Fallback: raw count ratio if all subtasks have zero estimated minutes
+    return Math.round((subtasks.filter(s => s.completed).length / subtasks.length) * 100);
+  }
+  return Math.round((completedMins / totalMins) * 100);
 }
 
 // ─── Signal b: staleness vs. expected pace ─────────────────────────────────
-// Compares actual (self-reported) progress against what the pace engine
-// *expects* given time elapsed. Returns an adjustment from -40 to 0:
-//   • 0: progress is at or ahead of the pace line → no penalty
-//   • negative: progress is behind the expected line → downward pressure
-//
-// This uses the SAME computePaceMetrics().expected already used for
-// Velocity Degradation Alerts and Trust Decay (Phase 3) — no duplication.
+// Compares actual (self-reported) progress against the pace engine's expected
+// line. Also checks staleness of the most recent activity (subtask tick OR
+// check-in — whichever is more recent). Returns an adjustment from -40 to 0.
 function stalenessSignal(task, now = Date.now()) {
-  const metrics = computePaceMetrics(task, now);
+  const metrics  = computePaceMetrics(task, now);
   const actual   = task.completionPercent || 0;
   const expected = metrics.expected;
 
-  // How stale is the last check-in?
+  // Find most recent activity: latest sparkline point OR latest completed subtask timestamp
+  let lastActivityMs = 0;
+
   const sparkline = task.sparkline || [];
-  let staleDays = 0;
   if (sparkline.length > 0) {
     const lastPt = [...sparkline]
       .filter(p => p.timestamp)
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
-    if (lastPt) {
-      staleDays = (now - new Date(lastPt.timestamp).getTime()) / DAY_MS;
-    }
+    if (lastPt) lastActivityMs = Math.max(lastActivityMs, new Date(lastPt.timestamp).getTime());
   }
 
-  // If progress is behind the expected line AND data is stale → additional penalty
+  // Also check subtask updatedAt if available (subtasks don't carry timestamps,
+  // but the task's updatedAt reflects the last subtask tick)
+  if (task.updatedAt) {
+    lastActivityMs = Math.max(lastActivityMs, new Date(task.updatedAt).getTime());
+  }
+
+  const staleDays = lastActivityMs > 0 ? (now - lastActivityMs) / DAY_MS : 0;
+
   const paceGap = actual - expected; // negative = behind
+  // Staleness amplifier: stale data over 1 day adds up to 1.5× to the penalty
   const stalenessMultiplier = staleDays > 1 ? Math.min(staleDays / 2, 1.5) : 1;
 
-  // Map: 0 behind → 0, 20% behind → -12, 40% behind → -20, with staleness amplifier
   const rawPenalty = Math.max(0, -paceGap) * 0.3 * stalenessMultiplier;
   return Math.round(Math.max(-40, -rawPenalty));
 }
@@ -115,15 +126,6 @@ function panicSignal(task, now = Date.now()) {
 }
 
 // ─── Core: compute behavioral drift ─────────────────────────────────────────
-// Returns:
-//   {
-//     inferredReal:   number (0-100) — our best estimate of true progress
-//     selfReported:   number         — task.completionPercent
-//     gap:            number         — inferredReal - selfReported (negative = user is ahead of reality)
-//     confidence:     'high'|'medium'|'low'|'sparse'
-//     signals:        { subtask, staleness, panic, language }
-//     explanation:    string[]       — human-readable breakdown of each signal
-//   }
 function computeBehavioralDrift(task, languageDelta = null, now = Date.now()) {
   // Sparse-data guard
   if (!hasEnoughSignal(task)) {
@@ -138,61 +140,66 @@ function computeBehavioralDrift(task, languageDelta = null, now = Date.now()) {
   }
 
   const selfReported = task.completionPercent || 0;
-  const subtask      = subtaskSignal(task);       // null if no subtasks
+  const subtask      = subtaskSignal(task);       // null if no subtasks (minutes-weighted)
   const staleAdj     = stalenessSignal(task, now);// ≤ 0 adjustment
   const panicAdj     = panicSignal(task, now);    // ≤ 0 adjustment
 
-  // Build weighted inferred estimate
-  // Start from self-reported as baseline, then adjust by signal gaps
-  let inferredReal;
   const explanation = [];
+  let inferredReal;
 
   if (subtask !== null) {
-    // We have subtask data — primary signal
-    // Blend subtask ratio (0.55 weight) with a staleness-adjusted self-reported (0.30 weight)
-    // + panic penalty (0.15 weight)
+    // Subtask evidence is primary. Blend:
+    //   55% → effort-weighted subtask completion
+    //   30% → staleness-penalised self-report (pace line pressure)
+    //   15% → raw self-report (anchor — prevents wild swings with few subtasks)
     const stalenessBase = Math.max(0, selfReported + staleAdj);
     inferredReal = (subtask * W_SUBTASK) + (stalenessBase * W_STALENESS) + (selfReported * W_PANIC);
 
-    const completedSubs = (task.subtasks || []).filter(s => s.completed).length;
-    const totalSubs     = (task.subtasks || []).length;
-    explanation.push(`Subtasks ${completedSubs}/${totalSubs} complete (${subtask}% done by this measure)`);
+    const completedMins = (task.subtasks || []).filter(s => s.completed).reduce((s, sub) => s + (sub.estimatedMinutes || 30), 0);
+    const totalMins     = (task.subtasks || []).reduce((s, sub) => s + (sub.estimatedMinutes || 30), 0);
+    const completedCount = (task.subtasks || []).filter(s => s.completed).length;
+    const totalCount     = (task.subtasks || []).length;
+    explanation.push(`${completedCount}/${totalCount} subtasks done (${completedMins}/${totalMins} min = ${subtask}% by effort)`);
   } else {
-    // No subtasks — use staleness-adjusted self-reported
+    // No subtasks — staleness-penalised self-report is all we have
     inferredReal = Math.max(0, selfReported + staleAdj);
-    explanation.push('No subtask data — estimate based on check-in recency and pace');
+    explanation.push('No subtask data — estimate based on check-in recency and pace alignment');
   }
 
-  // Apply panic penalty directly (don't weight it, just cap-subtract)
-  inferredReal = Math.max(0, inferredReal + panicAdj);
+  // Panic is a cap-subtract, not a blend weight, to avoid it being diluted
   if (panicAdj < 0) {
-    const daysSincePanic = task.panicScaffold && task.panicScaffold.generatedAt
+    inferredReal = Math.max(0, inferredReal + panicAdj);
+    const daysSincePanic = task.panicScaffold?.generatedAt
       ? Math.round((now - new Date(task.panicScaffold.generatedAt).getTime()) / DAY_MS)
       : 0;
-    explanation.push(`Panic Mode was triggered ${daysSincePanic}d ago — indicates past overestimation`);
+    explanation.push(`Panic Mode triggered ${daysSincePanic}d ago — progress was likely over-reported at that point`);
   }
 
   if (staleAdj < -2) {
-    explanation.push(`Progress data is stale — last check-in was behind the expected pace line`);
+    explanation.push(`Behind expected pace line + data is stale — applying downward pressure`);
   }
 
-  // Apply language delta (capped at ±15% of the final value)
+  // Language delta: capped at ±15% of current inferred value so it can't dominate
   let langEffect = 0;
   if (languageDelta !== null && typeof languageDelta === 'number' && !isNaN(languageDelta)) {
-    const capAmount = inferredReal * LANGUAGE_CAP;
+    const capAmount = Math.max(inferredReal * LANGUAGE_CAP, 5); // floor cap at 5% so fresh tasks aren't immune
     langEffect = Math.max(-capAmount, Math.min(capAmount, languageDelta * (capAmount / 20)));
     inferredReal = Math.max(0, Math.min(100, inferredReal + langEffect));
     if (Math.abs(languageDelta) > 3) {
-      explanation.push(`Language signal: ${languageDelta > 0 ? 'confident' : 'struggling'} tone detected in recent Omni-Bar input`);
+      explanation.push(`OmniBar language: ${languageDelta > 0 ? 'confident tone detected (+boost)' : 'struggling tone detected (−penalty)'}`);
     }
   }
 
   inferredReal = Math.round(Math.max(0, Math.min(100, inferredReal)));
   const gap = inferredReal - selfReported;
 
-  // Confidence: how many distinct signals do we have?
-  const signalCount = [subtask !== null, (task.sparkline || []).length > 0, panicAdj < 0, Math.abs(languageDelta || 0) > 3]
-    .filter(Boolean).length;
+  // Confidence: how many independent signals contributed meaningfully
+  const signalCount = [
+    subtask !== null,
+    (task.sparkline || []).length > 1,  // >1 point = there's actual history
+    panicAdj < 0,
+    Math.abs(languageDelta || 0) > 3,
+  ].filter(Boolean).length;
   const confidence = signalCount >= 3 ? 'high' : signalCount >= 2 ? 'medium' : 'low';
 
   return {
@@ -201,7 +208,7 @@ function computeBehavioralDrift(task, languageDelta = null, now = Date.now()) {
     gap,
     confidence,
     signals: {
-      subtask: subtask,
+      subtask,
       staleness: staleAdj,
       panic: panicAdj,
       language: Math.round(langEffect),

@@ -26,7 +26,7 @@ interface TechEntry {
 const STACK: TechEntry[] = [
   // ── Google Technologies ───────────────────────────────────────────────────
   {
-    name: 'Gemini 2.0 Flash',
+    name: 'Gemini 3.1 Flash Lite',
     badge: 'Vertex AI',
     icon: <Brain size={15} />,
     color: '#4285f4',
@@ -41,7 +41,7 @@ const STACK: TechEntry[] = [
     icon: <Brain size={15} />,
     color: '#4285f4',
     category: 'google',
-    what: 'Powers the Chaos Scanner — drop a photo of a whiteboard, syllabus, or schedule and Gemini Vision extracts structured tasks with deadlines and subtasks. Base64 inlineData sent to gemini-2.0-flash via Vertex AI. Deployed and live on Cloud Run.',
+    what: 'Powers the Chaos Scanner — drop a photo of a whiteboard, syllabus, or schedule and Gemini Vision extracts structured tasks with deadlines and subtasks. Base64 inlineData sent to gemini-3.1-flash-lite via Vertex AI. Deployed and live on Cloud Run.',
     docsUrl: 'https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/overview',
   },
   {
@@ -294,7 +294,7 @@ const TechStackPage: React.FC = () => {
           )}
         </div>
         <p className="text-[11px] font-mono leading-relaxed" style={{ color: 'var(--text-faint)' }}>
-          <span style={{ color: '#4285f4' }}>Vertex AI (Gemini 2.0 Flash)</span> — text + vision AI ·{' '}
+          <span style={{ color: '#4285f4' }}>Vertex AI (Gemini 3.1 Flash Lite)</span> — text + vision AI ·{' '}
           <span style={{ color: '#34a853' }}>Google Calendar API</span> — real schedule integration ·{' '}
           <span style={{ color: '#fbbc04' }}>Google OAuth 2.0</span> — identity ·{' '}
           <span style={{ color: '#ea4335' }}>Cloud Text-to-Speech</span> — voice output ·{' '}

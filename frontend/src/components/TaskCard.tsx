@@ -470,8 +470,9 @@ const TaskCard: React.FC<TaskCardProps> = ({
                 className="w-full flex items-center justify-center gap-2 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
                 style={{
                   background: task.status === 'RED' ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)',
-                  border: task.status === 'RED' ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(245,158,11,0.2)',
+                  border: task.status === 'RED' ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(245,158,11,0.3)',
                   color: task.status === 'RED' ? '#f87171' : '#fbbf24',
+                  boxShadow: task.status === 'RED' ? '0 0 0 1px rgba(239,68,68,0.12), 0 0 10px rgba(239,68,68,0.1)' : '0 0 0 1px rgba(245,158,11,0.12), 0 0 10px rgba(245,158,11,0.1)',
                 }}>
                 <MessageSquare size={10} />
                 Negotiate with {task.recipientName}
@@ -509,10 +510,11 @@ const TaskCard: React.FC<TaskCardProps> = ({
                 className="w-full flex items-center justify-center gap-2 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
                 style={{
                   background: 'rgba(239,68,68,0.1)',
-                  border: '1px solid rgba(239,68,68,0.22)',
+                  border: '1px solid rgba(239,68,68,0.35)',
                   color: '#f87171',
+                  boxShadow: '0 0 0 1px rgba(239,68,68,0.15), 0 0 12px rgba(239,68,68,0.12)',
                 }}
-                animate={isHot ? { boxShadow: ['0 0 0px rgba(239,68,68,0)', '0 0 10px rgba(239,68,68,0.4)', '0 0 0px rgba(239,68,68,0)'] } : {}}
+                animate={isHot ? { boxShadow: ['0 0 0 1px rgba(239,68,68,0.15), 0 0 8px rgba(239,68,68,0.2)', '0 0 0 1px rgba(239,68,68,0.25), 0 0 16px rgba(239,68,68,0.45)', '0 0 0 1px rgba(239,68,68,0.15), 0 0 8px rgba(239,68,68,0.2)'] } : {}}
                 transition={isHot ? { duration: 1.4, repeat: Infinity } : {}}
               >
                 <motion.div

@@ -33,6 +33,7 @@ import UltimatumModal from './UltimatumModal';
 import PanicModePanel from './PanicModePanel';
 import StartHereCard from './StartHereCard';
 import CountdownToast from './CountdownToast';
+import { useTour } from './TourContext';
 import { useToast } from './Toast';
 import DeadlineConfirmModal from './DeadlineConfirmModal';
 import InfoTooltip from './InfoTooltip';
@@ -179,6 +180,7 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
   const navigate = useNavigate();
   const { award } = useCredits();
   const { addToast } = useToast();
+  const { markSeen } = useTour();
 
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -346,7 +348,7 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
   const criticalCount = activeTasks.filter(t => t.status === 'RED').length;
   const warningCount = activeTasks.filter(t => t.status === 'AMBER').length;
   const avgHoursRaw = activeTasks.length > 0
-    ? activeTasks.reduce((s, t) => s + t.currentPaceHoursPerDay, 0) / activeTasks.length : 0;
+    ? activeTasks.reduce((s, t) => s + t.currentPaceHoursPerDay, 0) : 0;
   const avgHours = fmtHours(avgHoursRaw);
   // Real velocity score — blend of on-pace ratio + steadiness across active tasks
   const velocityScoreNum = activeTasks.length > 0
@@ -422,6 +424,7 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
   };
 
   const handleOpenHotStart = async (task: Task) => {
+    markSeen('panic-mode');
     // Always use PanicModePanel — show immediately with loading state
     setPanicState({ task, checklist: [], boilerplate: '', loading: true });
     try {
@@ -475,6 +478,7 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
       // First: check for a genuine two-task conflict → Ultimatum
       const evalResult = await evaluateUltimatum();
       if (evalResult.triggered) {
+        markSeen('ultimatum-engine');
         setUltimatum({ taskA: evalResult.taskA, taskB: evalResult.taskB });
         return; // modal takes over; do NOT run regular triage
       }
@@ -495,6 +499,7 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
   };
 
   const handleUltimatumResolved = (losingTask: Task, _winningTask: Task, _confirmation: string) => {
+    markSeen('ultimatum-engine');
     setUltimatum(null);
     // The losing task gets rescheduled — the user made a conscious call to defer it,
     // not abandon it. "Not Completed" is reserved for tasks that hit their deadline untouched.
@@ -512,6 +517,13 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
     window.addEventListener('velocity:omni-action', handler);
     return () => window.removeEventListener('velocity:omni-action', handler);
   }, [loadTasks]);
+
+  // ── Trigger ultimatum from Start Here card ───────────────────────────────────
+  useEffect(() => {
+    const handler = () => { handleTriage(); };
+    window.addEventListener('velocity:trigger-ultimatum', handler);
+    return () => window.removeEventListener('velocity:trigger-ultimatum', handler);
+  }, []);
 
   // ── Auto-recalc telemetry every 60s — real-time drift detection ─────────────
   useEffect(() => {
@@ -573,7 +585,7 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
 
   const STATS = [
     { icon: LayoutGrid,  label: 'Active Tasks',   value: loading ? '—' : String(activeTasks.length),    color: 'var(--text-primary)' },
-    { icon: Clock,       label: 'Avg/day',        value: loading ? '—' : avgHours,                     color: '#f59e0b' },
+    { icon: Clock,       label: 'Total/day',      value: loading ? '—' : avgHours,                     color: '#f59e0b' },
     { icon: TrendingUp,  label: 'Portfolio Health', value: loading ? '—' : forecastHealth !== null ? `${forecastHealth}%` : `${velocityScore}`, color: forecastHealth !== null ? (forecastHealth >= 70 ? '#22c55e' : forecastHealth >= 50 ? '#f59e0b' : '#ef4444') : velocityColor },
     { icon: CheckCircle, label: 'Completed',        value: loading ? '—' : String(completedTasks.length), color: '#22c55e' },
   ];
@@ -603,14 +615,14 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
           <div className="relative ml-auto flex items-center gap-2" data-tour="tour-omni">
             <motion.button
               onClick={() => setCreateModalOpen(true)}
-              whileHover={{ scale: 1.03, boxShadow: '0 0 18px rgba(34,197,94,0.2)' }}
+              whileHover={{ scale: 1.03, boxShadow: '0 0 20px rgba(34,197,94,0.3)' }}
               whileTap={{ scale: 0.97 }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
               style={{
                 background: 'linear-gradient(135deg, rgba(34,197,94,0.15), rgba(22,163,74,0.1))',
                 color: '#4ade80',
-                border: '1px solid rgba(34,197,94,0.35)',
-                boxShadow: '0 0 8px rgba(34,197,94,0.08)',
+                border: '1px solid rgba(34,197,94,0.45)',
+                boxShadow: '0 0 0 1px rgba(34,197,94,0.2), 0 0 12px rgba(34,197,94,0.15)',
                 letterSpacing: '0.01em',
               }}
             >
@@ -619,7 +631,11 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
             </motion.button>
           </div>
         </div>
-        <div data-tour="tour-braindump">
+        <div data-tour="tour-braindump" style={{
+            borderRadius: 14,
+            boxShadow: '0 0 0 1.5px rgba(34,197,94,0.35), 0 0 18px rgba(34,197,94,0.12)',
+            animation: 'none',
+          }}>
           <BrainDumpInput
             ref={brainDumpRef}
             onSubmit={handleQuickEntry}
@@ -650,8 +666,8 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
                 {label === 'Portfolio Health' && (
                   <InfoTooltip explanation="Likelihood all active tasks finish on time — weighted across deadlines. See the Forecast panel below for per-task breakdown." />
                 )}
-                {label === 'Avg/day' && (
-                  <InfoTooltip explanation="Average hours per day required across all active tasks to reach their deadlines at current pace." />
+                {label === 'Total/day' && (
+                  <InfoTooltip explanation="Total hours per day required across all active tasks to meet their deadlines at current pace. Matches the Required line in the Burnout chart." />
                 )}
               </div>
               <div className="font-bold font-mono text-2xl" style={{ color }}>
@@ -666,7 +682,7 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
 
         {/* Burnout Horizon — compact collapsible widget */}
         {!loading && activeTasks.length > 0 && (
-          <BurnoutChart tasks={tasks} isDark={isDark} onTriggerTriage={handleTriage} />
+          <BurnoutChart tasks={tasks} isDark={isDark} onTriggerTriage={handleTriage} onExpand={() => markSeen('burnout-horizon')} />
         )}
 
         {/* Velocity Forecast Agent */}

@@ -13,7 +13,7 @@ interface GoogleTechSectionProps {
 
 const GOOGLE_TECHS = [
   {
-    name: 'Gemini 2.0 Flash via Vertex AI',
+    name: 'Gemini 3.1 Flash Lite via Vertex AI',
     badge: 'Google Cloud AI',
     icon: <Brain size={15} />,
     color: '#4285f4',
@@ -87,10 +87,6 @@ const GoogleTechSection: React.FC<GoogleTechSectionProps> = ({ reducedMotion }) 
           className="mb-10"
         >
           <div className="flex items-center gap-3 mb-6">
-            {['#4285f4', '#ea4335', '#fbbc04', '#34a853'].map(c => (
-              <div key={c} className="w-3 h-3 rounded-full" style={{ background: c }} />
-            ))}
-            <span className="text-[11px] font-mono uppercase tracking-widest" style={{ color: 'var(--text-faint)' }}>Built natively on Google Cloud</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-bold mb-4" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
             Every Google API is live and wired in
@@ -111,7 +107,7 @@ const GoogleTechSection: React.FC<GoogleTechSectionProps> = ({ reducedMotion }) 
         >
           <p className="text-[11px] font-mono leading-relaxed" style={{ color: 'var(--text-muted)' }}>
             Velocity's AI backbone runs on{' '}
-            <span style={{ color: '#4285f4' }}>Vertex AI (Gemini 2.0 Flash)</span> for all text and vision reasoning,{' '}
+            <span style={{ color: '#4285f4' }}>Vertex AI (Gemini 3.1 Flash Lite)</span> for all text and vision reasoning,{' '}
             <span style={{ color: '#34a853' }}>Google Calendar API</span> for real schedule data,{' '}
             <span style={{ color: '#fbbc04' }}>Google OAuth 2.0</span> for identity,{' '}
             <span style={{ color: '#ea4335' }}>Cloud Text-to-Speech</span> for voice output, and{' '}
@@ -138,7 +134,12 @@ const GoogleTechSection: React.FC<GoogleTechSectionProps> = ({ reducedMotion }) 
                   {tech.icon}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold mb-0.5" style={{ color: 'var(--text-primary)' }}>{tech.name}</div>
+                  <div className="text-xs font-semibold mb-0.5" style={{ color: 'var(--text-primary)' }}>
+                    {tech.name}
+                    {tech.name === 'Google Sign-In (OAuth 2.0)' && (
+                      <span className="ml-1.5 text-[9px] font-mono font-normal" style={{ color: 'var(--text-faint)' }}>*test mode only</span>
+                    )}
+                  </div>
                   <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full inline-block"
                     style={{ background: `${tech.color}10`, color: tech.color, border: `1px solid ${tech.color}20` }}>
                     {tech.badge}

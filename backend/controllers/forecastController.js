@@ -230,9 +230,9 @@ async function handleForecast(req, res) {
     portfolioHealth = 100;
   } else {
     const weights = forecasts.map(f => {
-      // RED tasks count 3×, AMBER 2×, GREEN 1× in the average
-      const task = activeTasks.find(t => t.id === f.taskId);
-      const w = task?.status === 'RED' ? 3 : task?.status === 'AMBER' ? 2 : 1;
+      // Weight by live risk level (derived from probability) — not stale DB status
+      // critical (<45%) counts 3×, watch (<65%) 2×, safe 1×
+      const w = f.riskLevel === 'critical' ? 3 : f.riskLevel === 'watch' ? 2 : 1;
       return { probability: f.probability, weight: w };
     });
     const totalWeight = weights.reduce((s, w) => s + w.weight, 0);

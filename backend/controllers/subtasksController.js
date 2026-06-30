@@ -11,16 +11,27 @@ const { computePaceMetrics } = require('../utils/paceEngine');
 const TaskModel = require('../models/Task');
 const { isConnected } = require('../db/connection');
 
-// Recompute completionPercent from subtask ratio and update sparkline + pace
+// Recompute pace from subtask state WITHOUT touching completionPercent.
+// Subtask ticks update the objective evidence (for drift detection) but
+// must NOT overwrite the user's self-reported completionPercent — that
+// would collapse the gap that behavioral drift measures.
+// We still recompute pace/status so required hours/day stays accurate.
 function deriveTaskUpdates(updatedSubtasks, task, now = new Date().toISOString()) {
-  const completedCount = updatedSubtasks.filter(s => s.completed).length;
-  const completionPercent = updatedSubtasks.length > 0
-    ? Math.round((completedCount / updatedSubtasks.length) * 100)
-    : task.completionPercent || 0;
+  // Keep the user's self-reported number — do NOT derive it from subtask ratio.
+  const completionPercent = task.completionPercent || 0;
+
+  // Append a sparkline point weighted by estimated minutes, not raw ratio.
+  // This gives a more honest picture of effort: a 90-min subtask ticked
+  // counts more than a 5-min one.
+  const totalMins     = updatedSubtasks.reduce((s, sub) => s + (sub.estimatedMinutes || 30), 0);
+  const completedMins = updatedSubtasks.filter(s => s.completed).reduce((s, sub) => s + (sub.estimatedMinutes || 30), 0);
+  const subtaskEvidencePct = totalMins > 0
+    ? Math.round((completedMins / totalMins) * 100)
+    : Math.round((updatedSubtasks.filter(s => s.completed).length / Math.max(updatedSubtasks.length, 1)) * 100);
 
   const sparkline = [
     ...(Array.isArray(task.sparkline) ? task.sparkline : []).slice(-29),
-    { value: completionPercent, timestamp: now },
+    { value: subtaskEvidencePct, timestamp: now, source: 'subtask' },
   ];
 
   const projected = { ...task, subtasks: updatedSubtasks, completionPercent, sparkline };
@@ -28,7 +39,7 @@ function deriveTaskUpdates(updatedSubtasks, task, now = new Date().toISOString()
 
   return {
     subtasks: updatedSubtasks,
-    completionPercent,
+    // completionPercent intentionally NOT included — slider owns this
     sparkline,
     currentPaceHoursPerDay: paceMetrics.requiredHoursPerDay,
     status: projected.status !== 'COMPLETE' && projected.status !== 'failed'

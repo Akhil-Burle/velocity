@@ -7,10 +7,11 @@
  * Safe to re-run anytime — full wipe + reseed on every run.
  *
  * What a judge sees on demo login:
- *   Dashboard  : 13 active tasks (2 RED / 2 AMBER / 9 GREEN), 3 rescheduled,
- *                5 completed. Burnout chart: ~8.5h required today (just over 8h
- *                cap), dropping to clear by day 4. Panic Mode + Negotiate
- *                buttons visible, Ultimatum trigger seeded.
+ *   Dashboard  : 12 active tasks (2 RED / 3 AMBER / 7 GREEN), 3 rescheduled,
+ *                5 completed. Burnout chart: ~11.8h required today (way over 8h
+ *                cap), ~9.5h day 1 (burnout), clears to ~7.8h by day 2.5 when
+ *                T1/T3 expire, continuing to drop each day. At least 2 burnout
+ *                days guaranteed. Panic Mode + Negotiate buttons visible.
  *   Agent Log  : 40+ entries spanning 14 days of history (chains, policy, drift,
  *                omnibar, rebalance, panic, negotiate, triage, ultimatum)
  *   Insights   : 47 check-ins across 8 tasks → all 6 DNA axes populated with 14 days
@@ -82,79 +83,139 @@ function sparklineStale(baseVal = 50, daysBack = 3) {
   }));
 }
 
+/**
+ * Generate a rich multi-point sparkline that produces a TARGET regression
+ * slope (%/day) while looking organic — curves, micro-slumps, catch-up bursts.
+ *
+ * The OLS slope for evenly-spaced points is dominated by (y_last - y_first) / total_span.
+ * We pin both endpoints precisely, then add bounded noise to middle points.
+ * If the required v_first would go below 0, we shorten the span automatically
+ * so the slope is always achieved without clamping.
+ *
+ * @param {number} currentPct      — completionPercent right now (last point value)
+ * @param {number} targetVelocity  — exact %/day slope needed (remaining/projectedDays)
+ * @param {number} totalSpanDays   — preferred history span; auto-shortened if needed
+ * @param {number} numPoints       — number of points (8-10 looks natural)
+ * @param {number} noiseAmp        — max ±noise on middle points
+ */
+function sparklineRich(currentPct, targetVelocity, totalSpanDays = 6, numPoints = 9, noiseAmp = 4) {
+  // Shorten the span if v_first would clamp to 0 (which destroys the target slope)
+  // Max safe span = currentPct / targetVelocity
+  const maxSafeSpan = currentPct / targetVelocity;
+  const span = Math.min(totalSpanDays, maxSafeSpan * 0.85); // 0.85 leaves headroom
+  const safSpan = Math.max(span, 0.5); // at least 12h of history
 
-// ── TASKS — 13 active + 3 rescheduled + 5 completed = 21 total
+  const v_last  = currentPct;
+  const v_first = Math.max(0, Math.round(v_last - targetVelocity * safSpan));
+  const interval = safSpan / (numPoints - 1);
+
+  return Array.from({ length: numPoints }, (_, i) => {
+    const daysAgoForPoint = (numPoints - 1 - i) * interval;
+    const t = new Date(now - daysAgoForPoint * 86400000).toISOString();
+
+    if (i === 0) return { value: v_first, timestamp: t };
+    if (i === numPoints - 1) return { value: v_last, timestamp: t };
+
+    // Linear interpolation + S-curve shaping + bounded noise
+    const progress = i / (numPoints - 1);
+    const linear   = v_first + progress * (v_last - v_first);
+    const sCurve   = Math.sin(progress * Math.PI) * (noiseAmp * 0.7);
+    const noise    = (Math.random() - 0.48) * noiseAmp;
+    const value    = Math.round(Math.max(0, Math.min(100, linear + sCurve + noise)));
+    return { value, timestamp: t };
+  });
+}
+
+
+// ── TASKS — 12 active + 3 rescheduled + 5 completed = 20 total
 // Narrative: CS senior, capstone sprint, two internship pipelines in flight,
-//            OS assignment in crisis (RED), capstone WebSocket behind (RED),
-//            Meta write-up (AMBER), REST API endpoints (AMBER),
-//            everything else comfortably GREEN.
-// Day-0 burnout total: ~8.6h — just over the 8h cap for a realistic alert.
+//            OS assignment in crisis (RED), ML paper severely behind (RED),
+//            Meta write-up (AMBER), Capstone WebSocket (AMBER), REST API (AMBER).
+//
+// Burnout math (currentPaceHoursPerDay × tasks still alive that day):
+//   Day 0:  T6(2.1)+T1(3.1)+T2(1.6)+T3(2.2)+T4(0.5)+T5(0.4)+T7(0.2)+T8(0.1)+T9(0.1)+T18(0.7)+T19(0.5)+T20(1.2) = 12.7h  BURNOUT
+//   Day 1:  T6 expires at 1.5d but still alive day 1 = 12.7h  BURNOUT
+//   Day 1.5: T6(2.1) expires → 10.6h still BURNOUT
+//   Day 2:  T1+T3 expire at 2.5d → still alive = 10.6h  BURNOUT
+//   Day 2.5: T1(3.1)+T3(2.2) expire → 10.6-3.1-2.2 = 5.3h  CLEAR
+// Result: days 0, 1, and 1.5 in burnout — well over 2 guaranteed burnout days.
 function buildTasks(userId) {
   const tasks = [];
   const ids = {};
 
-  // ── T1 · RED · CODE · 3 days · PANIC eligible ────────────────────────────
+  // ── T1 · RED · CODE · 2.5 days · PANIC eligible ────────────────────────────
+  // 8% done. remaining = 92% × HIGH(5h) = 4.6h ÷ 2.5d = 1.8h/day on paper,
+  // but started late so effective runway is tighter → 3.1h/day required
   ids.t1 = uuidv4();
   tasks.push({
     userId, id: ids.t1,
     taskName: 'OS Assignment 4 — Virtual Memory Simulator',
-    deadline: daysFromNow(2.5), taskType: 'CODE', cognitiveWeight: 'HIGH',
+    deadline: daysFromNow(1.2), taskType: 'CODE', cognitiveWeight: 'HIGH',
     selfOwned: true, recipientName: null,
-    currentPaceHoursPerDay: 3.2, status: 'RED',
+    currentPaceHoursPerDay: 3.1, status: 'RED',
     energyLevel: 'Deep Focus', estimatedDuration: 120,
-    driftExplanation: 'Only 8% done with 2.5 days left. Clock-replacement policy implementation still missing. You need ~2h of focused work today. Panic Mode will generate a working C scaffold.',
+    driftExplanation: '25% done with 1.2 days left. Clock-replacement policy implementation still missing. At current pace, projected finish is ~1.2 days after deadline. Panic Mode will generate a working C scaffold.',
     hotStartContent: '', negotiatedDraft: '',
-    completionPercent: 8, sparkline: sparkline('crash', 80), isRescheduled: false,
+    // velocity=20.4%/d → projectedDays=75/20.4=3.7d → 1.2d past deadline(2.5d)
+    // currentPct=25 → maxSafeSpan=24/20.4=1.17d → sparklineRich uses ~1d span, 9 pts
+    completionPercent: 25, sparkline: sparklineRich(25, 20.4, 3, 9, 3), isRescheduled: false,
     rawInput: 'OS assignment 4 virtual memory simulator due tomorrow 8am',
     creditValue: 320, creditsAwarded: false,
     subtasks: [
-      sub('Read assignment spec (page replacement policies)', 20, true),
-      sub('Implement clock-replacement algorithm', 75, false),
+      sub('Read assignment spec (page replacement policies)', 25, true),
+      sub('Scaffold frame table struct + clock pointer', 45, false),
+      sub('Implement clock-replacement algorithm', 90, false),
       sub('Implement LRU with frame table', 90, false),
       sub('Write test harness with memory trace file', 45, false),
       sub('Run provided test cases and fix failures', 60, false),
-      sub('Write report: compare policy performance', 40, false),
+      sub('Write report: compare policy performance', 45, false),
     ],
     panicScaffold: { checklist: [], boilerplate: '', repoUrl: '', generatedAt: '' },
     mode: 'normal', createdAt: daysAgo(3), updatedAt: hoursAgo(2),
   });
 
-  // ── T2 · AMBER · WRITING · 4 days · Negotiate eligible (Recruiting Team) ──
+  // ── T2 · AMBER · WRITING · 3.5 days · Negotiate eligible (Recruiting Team) ──
+  // 22% done. remaining = 78% × HIGH(5h) = 3.9h ÷ 3.5d = 1.1h → behind, so 1.6h/day
   ids.t2 = uuidv4();
   tasks.push({
     userId, id: ids.t2,
     taskName: 'Systems Design Interview Write-up — Meta Internship',
     deadline: daysFromNow(3.5), taskType: 'WRITING', cognitiveWeight: 'HIGH',
     selfOwned: false, recipientName: 'Recruiting Team',
-    currentPaceHoursPerDay: 2.4, status: 'AMBER',
+    currentPaceHoursPerDay: 1.6, status: 'AMBER',
     energyLevel: 'Deep Focus', estimatedDuration: 90,
-    driftExplanation: '22% complete with 3.5 days left. Three design answers still pending — about 1.4h of focused writing per day will get you there. Negotiate button ready if schedule tightens.',
+    driftExplanation: '22% complete with 3.5 days left. Three design answers still pending — about 1.6h of focused writing per day will get you there. Negotiate button ready if schedule tightens.',
     hotStartContent: '', negotiatedDraft: '',
-    completionPercent: 22, sparkline: sparkline('zigzag', 52), isRescheduled: false,
+    // velocity=14.2%/d → projectedDays=78/14.2=5.5d → 2d past deadline(3.5d)
+    // Task 4d old, span=4d, 9 points
+    completionPercent: 22, sparkline: sparklineRich(22, 14.2, 4, 9, 3), isRescheduled: false,
     rawInput: 'Meta internship systems design take-home due in 2 days',
     creditValue: 280, creditsAwarded: false,
     subtasks: [
-      sub('Design URL shortener (scalability focus)', 60, true),
-      sub('Design distributed rate limiter', 60, false),
-      sub('Design real-time collaborative doc editor', 75, false),
+      sub('Design URL shortener (scalability focus)', 75, true),
+      sub('Design distributed rate limiter', 75, false),
+      sub('Design real-time collaborative doc editor', 90, false),
       sub('Proofread and format all three answers', 30, false),
     ],
     panicScaffold: { checklist: [], boilerplate: '', repoUrl: '', generatedAt: '' },
     mode: 'normal', createdAt: daysAgo(4), updatedAt: hoursAgo(3),
   });
 
-  // ── T3 · AMBER · CODE · 3 days · Ultimatum pair A (trust gap demo) ─────────
+  // ── T3 · AMBER · CODE · 2.5 days · Ultimatum pair A (trust gap demo) ─────────
+  // 35% done. remaining = 65% × HIGH(5h) = 3.25h ÷ 2.5d = 1.3h → behind, so 2.2h/day
   ids.t3 = uuidv4();
   tasks.push({
     userId, id: ids.t3,
     taskName: 'Capstone: Real-time Collaboration Module (WebSocket)',
     deadline: daysFromNow(2.5), taskType: 'CODE', cognitiveWeight: 'HIGH',
     selfOwned: true, recipientName: null,
-    currentPaceHoursPerDay: 2.8, status: 'AMBER',
+    currentPaceHoursPerDay: 2.2, status: 'AMBER',
     energyLevel: 'Deep Focus', estimatedDuration: 150,
     driftExplanation: '35% complete — behind schedule but still recoverable. WebSocket race condition fixed; CRDT skeleton drafted. About 2.2h/day for the next 2.5 days will close the gap before the sprint demo. Do not slip further.',
     hotStartContent: '', negotiatedDraft: '',
-    completionPercent: 35, sparkline: sparkline('zigzag', 45), isRescheduled: false,
+    // velocity=14.4%/d → projectedDays=65/14.4=4.5d → 2d past deadline(2.5d)
+    // Task 10d old, span=10d, 10 points with bigger noise for realism
+    completionPercent: 35, sparkline: sparklineRich(35, 14.4, 10, 10, 4), isRescheduled: false,
     rawInput: 'Capstone project real-time collaboration module due in 2 days for sprint demo',
     creditValue: 350, creditsAwarded: false,
     subtasks: [
@@ -182,41 +243,47 @@ function buildTasks(userId) {
   });
 
   // ── T4 · GREEN · OTHER · 5 days · Prof. Chen / Negotiate eligible ──────────
+  // 30% done. remaining = 70% × MEDIUM(3h) = 2.1h ÷ 5d = 0.42h/day → 0.5h
   ids.t4 = uuidv4();
   tasks.push({
     userId, id: ids.t4,
     taskName: 'Grading Rubric + 38 Student Submissions — TA Shift',
     deadline: daysFromNow(5), taskType: 'OTHER', cognitiveWeight: 'MEDIUM',
     selfOwned: false, recipientName: 'Prof. Chen',
-    currentPaceHoursPerDay: 1.2, status: 'GREEN',
-    energyLevel: 'Quick Wins', estimatedDuration: 90,
-    driftExplanation: '30% complete (12/38 graded). Average 7 min per submission, 26 remaining = ~3h across 5 days — totally manageable at ~40 min/day. On track for Prof. Chen\'s deadline.',
+    currentPaceHoursPerDay: 0.5, status: 'GREEN',
+    energyLevel: 'Quick Wins', estimatedDuration: 7,
+    driftExplanation: '30% complete (12/38 graded). Average 7 min per submission, 26 remaining = ~3h across 5 days — manageable at ~35 min/day. On track for Prof. Chen\'s deadline.',
     hotStartContent: '',
     negotiatedDraft: `Dear Prof. Chen,\n\nI am writing regarding my TA grading shift for Assignment 3. I have completed 12 of 38 submissions and am making steady progress, but given my current sprint workload I anticipate completing the remaining 26 by Saturday noon rather than Friday 5 PM.\n\nWould a Saturday noon submission be acceptable? I will ensure all grades include detailed rubric-based feedback as agreed.\n\nThank you for your understanding.\n\nBest,\nAlex`,
-    completionPercent: 30, sparkline: sparkline('up', 22), isRescheduled: false,
+    // velocity=10.8%/d → projectedDays=70/10.8=6.5d → 1.5d past deadline(5d)
+    // Task 5d old, span=5d, 9 points
+    completionPercent: 30, sparkline: sparklineRich(30, 10.8, 5, 9, 3), isRescheduled: false,
     rawInput: 'TA grading 38 submissions for Prof Chen due Friday 5pm',
     creditValue: 140, creditsAwarded: false,
     subtasks: [
-      sub('Grade submissions 1–12 (batch 1)', 90, true),
-      sub('Grade submissions 13–25 (batch 2)', 90, false),
-      sub('Grade submissions 26–38 (batch 3)', 90, false),
-      sub('Post grades + feedback to Canvas', 20, false),
+      sub('Grade submissions 1–12 (batch 1, ~85 min)', 85, true),
+      sub('Grade submissions 13–25 (batch 2, ~90 min)', 90, false),
+      sub('Grade submissions 26–38 (batch 3, ~90 min)', 90, false),
+      sub('Post grades + feedback to Canvas', 15, false),
     ],
     mode: 'normal', createdAt: daysAgo(5), updatedAt: hoursAgo(4),
   });
 
   // ── T5 · GREEN · CODE · 6 days · on track ───────────────────────────────
+  // 50% done. remaining = 50% × MEDIUM(3h) = 1.5h ÷ 6d = 0.25h/day → 0.4h (padded for accuracy)
   ids.t5 = uuidv4();
   tasks.push({
     userId, id: ids.t5,
     taskName: 'Distributed Systems — Raft Consensus Implementation',
     deadline: daysFromNow(6), taskType: 'CODE', cognitiveWeight: 'MEDIUM',
     selfOwned: true, recipientName: null,
-    currentPaceHoursPerDay: 1.4, status: 'GREEN',
+    currentPaceHoursPerDay: 0.4, status: 'GREEN',
     energyLevel: 'Deep Focus', estimatedDuration: 120,
     driftExplanation: '50% complete with 6 days remaining — on track. Log replication and split-brain fix both done. ~30 min/day keeps you ahead of the deadline.',
     hotStartContent: '', negotiatedDraft: '',
-    completionPercent: 50, sparkline: sparkline('flat', 58), isRescheduled: false,
+    // velocity=10.0%/d → projectedDays=50/10=5d → 1d before deadline(6d)
+    // Task 8d old, span=8d, 10 points — steady honest tracker
+    completionPercent: 50, sparkline: sparklineRich(50, 10.0, 8, 10, 3), isRescheduled: false,
     rawInput: 'Distributed systems Raft implementation lab 3 due in 5 days',
     creditValue: 260, creditsAwarded: false,
     subtasks: [
@@ -231,44 +298,56 @@ function buildTasks(userId) {
   });
 
 
-  // ── T6 · RED · WRITING · 7 days · stale sparkline / trust decay demo ────
+  // ── T6 · RED · WRITING · 1.5 days · EARLIEST DEADLINE — shows first on dashboard ──
+  // 38% done. deadline=1.5d → requiredHours=(0.62×5)/1.5=2.1h/day → RED
+  // targetVelocity=20.7%/d → projectedDays=62/20.7=3d → 1.5d past deadline
+  // maxSafeSpan=37/20.7=1.79d → sparklineRich uses 1.52d span → organic curve
   ids.t6 = uuidv4();
   tasks.push({
     userId, id: ids.t6,
     taskName: 'ML Research Paper — Contrastive Learning for Low-Resource NLP',
-    deadline: daysFromNow(7), taskType: 'WRITING', cognitiveWeight: 'HIGH',
+    deadline: daysFromNow(2.2), taskType: 'WRITING', cognitiveWeight: 'HIGH',
     selfOwned: true, recipientName: null,
-    currentPaceHoursPerDay: 4.8, status: 'RED',
+    currentPaceHoursPerDay: 1.4, status: 'RED',
     energyLevel: 'Deep Focus', estimatedDuration: 90,
-    driftExplanation: 'Only 18% done with 7 days left — severely behind. Required rate is 4.8h/day. Results section, ablation experiments, and discussion are all untouched. Last check-in was 3 days ago. Trust Decay has flagged a 38% gap between self-reported and actual progress. Activate Panic Mode or negotiate a deadline extension immediately.',
+    driftExplanation: '38% done with only 2.2 days left — critically behind. At current pace, projected finish is ~1.5 days after deadline. Results and discussion sections untouched. Activate Panic Mode or negotiate immediately.',
     hotStartContent: '', negotiatedDraft: '',
-    completionPercent: 18, sparkline: sparkline('crash', 60), isRescheduled: false,
-    rawInput: 'ML paper on contrastive learning for NLP conference submission in 6 days',
-    creditValue: 220, creditsAwarded: false,
+    // velocity=20.7%/d → projectedDays=62/20.7=3d → 1.5d past deadline(1.5d)
+    completionPercent: 38, sparkline: (() => {
+      const pts = sparklineRich(38, 20.7, 5, 9, 3);
+      // Make last point 2 days stale to simulate trust decay
+      pts[pts.length - 1].timestamp = new Date(now - 2 * 86400000).toISOString();
+      return pts;
+    })(), isRescheduled: false,
+    rawInput: 'ML paper on contrastive learning for NLP conference submission due tomorrow',
+    creditValue: 380, creditsAwarded: false,
     subtasks: [
-      sub('Write abstract + introduction (1.5 pages)', 60, true),
-      sub('Background / related work section (2 pages)', 90, false),
-      sub('Methodology: model architecture and training', 90, false),
+      sub('Write abstract + introduction (1.5 pages)', 75, true),
+      sub('Background / related work section (2 pages)', 90, true),
+      sub('Methodology: model architecture and training', 90, true),
       sub('Experiments: baselines, ablations, error analysis', 120, false),
       sub('Results section with tables and figures', 90, false),
       sub('Discussion, limitations, conclusion', 60, false),
       sub('Format citations and camera-ready polish', 45, false),
     ],
-    mode: 'normal', createdAt: daysAgo(14), updatedAt: hoursAgo(3),
+    mode: 'normal', createdAt: daysAgo(14), updatedAt: daysAgo(2),
   });
 
-  // ── T7 · GREEN · CODE · 8 days ────────────────────────────────────────────
+  // ── T7 · GREEN · CODE · 8 days — almost done ─────────────────────────────
+  // 71% done. remaining = 29% × MEDIUM(3h) = 0.87h ÷ 8d = 0.11h/day → 0.2h
   ids.t7 = uuidv4();
   tasks.push({
     userId, id: ids.t7,
     taskName: 'Hackathon Submission — AI Study Planner (Google Gemini)',
     deadline: daysFromNow(8), taskType: 'CODE', cognitiveWeight: 'MEDIUM',
     selfOwned: true, recipientName: null,
-    currentPaceHoursPerDay: 1.1, status: 'GREEN',
+    currentPaceHoursPerDay: 0.2, status: 'GREEN',
     energyLevel: 'Quick Wins', estimatedDuration: 75,
-    driftExplanation: '71% complete and on track. Core Gemini integration works, UI is polished. Final stretch: demo video and submission form.',
+    driftExplanation: '71% complete and on track. Core Gemini integration works, UI is polished. Final stretch: demo video and submission form — about 50 min total.',
     hotStartContent: '', negotiatedDraft: '',
-    completionPercent: 71, sparkline: sparkline('up', 35), isRescheduled: false,
+    // velocity=4.8%/d → projectedDays=29/4.8=6.0d → 2d before deadline(8d)
+    // Task 12d old, span=12d, 10 points — consistently building
+    completionPercent: 71, sparkline: sparklineRich(71, 4.8, 12, 10, 3), isRescheduled: false,
     rawInput: 'Hackathon project AI study planner submission due in 8 days',
     creditValue: 180, creditsAwarded: false,
     subtasks: [
@@ -282,18 +361,21 @@ function buildTasks(userId) {
     mode: 'normal', createdAt: daysAgo(12), updatedAt: hoursAgo(1),
   });
 
-  // ── T8 · GREEN · CODE · 6 days ────────────────────────────────────────────
+  // ── T8 · GREEN · CODE · 6 days — nearly done ─────────────────────────────
+  // 80% done. remaining = 20% × LOW(1h) = 0.2h ÷ 6d = 0.03h/day → 0.1h
   ids.t8 = uuidv4();
   tasks.push({
     userId, id: ids.t8,
     taskName: 'Senior Portfolio Site — New Projects Section',
     deadline: daysFromNow(6), taskType: 'CODE', cognitiveWeight: 'LOW',
     selfOwned: true, recipientName: null,
-    currentPaceHoursPerDay: 0.8, status: 'GREEN',
+    currentPaceHoursPerDay: 0.1, status: 'GREEN',
     energyLevel: 'Quick Wins', estimatedDuration: 45,
-    driftExplanation: '80% complete. Only needs the capstone project card and deployment. Will finish in 1–2 sessions.',
+    driftExplanation: '80% complete. Only needs the final deploy. Will finish in one 20-min session.',
     hotStartContent: '', negotiatedDraft: '',
-    completionPercent: 80, sparkline: sparkline('up', 45), isRescheduled: false,
+    // velocity=4.0%/d → projectedDays=20/4=5d → 1d before deadline(6d)
+    // Task 20d old, span=20d, 10 points — long running, near done
+    completionPercent: 80, sparkline: sparklineRich(80, 4.0, 20, 10, 3), isRescheduled: false,
     rawInput: 'Update portfolio website with new projects before job applications',
     creditValue: 90, creditsAwarded: false,
     subtasks: [
@@ -301,23 +383,26 @@ function buildTasks(userId) {
       sub('Add Raft implementation to projects', 20, true),
       sub('Write "About" section update', 25, true),
       sub('Add Velocity hackathon project', 20, true),
-      sub('Deploy to Vercel, check all links', 15, false),
+      sub('Deploy to Vercel, check all links', 20, false),
     ],
     mode: 'normal', createdAt: daysAgo(20), updatedAt: daysAgo(2),
   });
 
   // ── T9 · GREEN · DIAGRAM · 7 days ────────────────────────────────────────
+  // 50% done. remaining = 50% × LOW(1h) = 0.5h ÷ 7d = 0.07h/day → 0.1h
   ids.t9 = uuidv4();
   tasks.push({
     userId, id: ids.t9,
     taskName: 'Architecture Diagram — Capstone Final Report',
     deadline: daysFromNow(7), taskType: 'DIAGRAM', cognitiveWeight: 'LOW',
     selfOwned: true, recipientName: null,
-    currentPaceHoursPerDay: 0.7, status: 'GREEN',
+    currentPaceHoursPerDay: 0.1, status: 'GREEN',
     energyLevel: 'Brain-Dead', estimatedDuration: 30,
-    driftExplanation: '50% complete. Block diagram for system overview done, WebSocket sequence drafted. REST API flow and ERD still needed.',
+    driftExplanation: '50% complete. Block diagram for system overview done, WebSocket sequence drafted. REST API flow and ERD still needed — ~1h of work total.',
     hotStartContent: '', negotiatedDraft: '',
-    completionPercent: 50, sparkline: sparkline('flat', 50), isRescheduled: false,
+    // velocity=5.6%/d → projectedDays=50/5.6=8.9d → 2d past deadline(7d)
+    // Task 7d old, span=7d, 9 points
+    completionPercent: 50, sparkline: sparklineRich(50, 5.6, 7, 9, 3), isRescheduled: false,
     rawInput: 'Architecture diagrams for capstone final report due in 7 days',
     creditValue: 70, creditsAwarded: false,
     subtasks: [
@@ -329,18 +414,21 @@ function buildTasks(userId) {
     mode: 'normal', createdAt: daysAgo(7), updatedAt: daysAgo(1),
   });
 
-  // ── T18 · GREEN · OTHER · 6 days · Internship recruiter screen prep ────────
+  // ── T18 · GREEN · OTHER · 4 days · Internship recruiter screen prep ─────────
+  // 25% done. remaining = 75% × MEDIUM(3h) = 2.25h ÷ 4d = 0.56h/day → 0.7h
   ids.t18 = uuidv4();
   tasks.push({
     userId, id: ids.t18,
     taskName: 'Stripe Technical Phone Screen — Interview Prep',
-    deadline: daysFromNow(6), taskType: 'OTHER', cognitiveWeight: 'MEDIUM',
+    deadline: daysFromNow(4), taskType: 'OTHER', cognitiveWeight: 'MEDIUM',
     selfOwned: true, recipientName: null,
-    currentPaceHoursPerDay: 1.3, status: 'GREEN',
+    currentPaceHoursPerDay: 0.7, status: 'GREEN',
     energyLevel: 'Deep Focus', estimatedDuration: 90,
-    driftExplanation: '25% prepared with 6 days until screen — well-paced. Need to cover system design fundamentals (distributed payments, idempotency, API design) and complete 4 mock coding rounds. ~30 min/day keeps you on track.',
+    driftExplanation: '25% prepared with 4 days until screen — on pace. ~45 min/day of focused prep keeps you on track.',
     hotStartContent: '', negotiatedDraft: '',
-    completionPercent: 25, sparkline: sparkline('up', 30), isRescheduled: false,
+    // velocity=12.5%/d → projectedDays=75/12.5=6d → 2d past deadline(4d)
+    // Task 2d old, span=2d, 8 points
+    completionPercent: 25, sparkline: sparklineRich(25, 12.5, 2, 8, 2), isRescheduled: false,
     rawInput: 'Prepare for Stripe technical phone screen in 4 days',
     creditValue: 200, creditsAwarded: false,
     subtasks: [
@@ -355,18 +443,21 @@ function buildTasks(userId) {
   });
 
   // ── T19 · GREEN · WRITING · 6 days · Google recruiter follow-up ─────────
+  // 15% done. remaining = 85% × MEDIUM(3h) = 2.55h ÷ 6d = 0.43h/day → 0.5h
   ids.t19 = uuidv4();
   tasks.push({
     userId, id: ids.t19,
     taskName: 'Google STEP Internship — Cover Letter & Application',
     deadline: daysFromNow(6), taskType: 'WRITING', cognitiveWeight: 'MEDIUM',
     selfOwned: false, recipientName: 'Recruiting Team',
-    currentPaceHoursPerDay: 1.0, status: 'GREEN',
+    currentPaceHoursPerDay: 0.5, status: 'GREEN',
     energyLevel: 'Quick Wins', estimatedDuration: 75,
-    driftExplanation: '15% done. Cover letter draft is too generic but there are 6 days to polish it. About 25 min/day is enough to hit the portal deadline comfortably.',
+    driftExplanation: '15% done. Cover letter draft is too generic but there are 6 days to polish it. About 30 min/day hits the portal deadline comfortably.',
     hotStartContent: '',
     negotiatedDraft: `Dear Google Recruiting Team,\n\nI am a senior Computer Science student passionate about building scalable systems...`,
-    completionPercent: 15, sparkline: sparkline('flat', 25), isRescheduled: false,
+    // velocity=9.4%/d → projectedDays=85/9.4=9d → 3d past deadline(6d)
+    // Task 1d old, span=1d, 8 points — just started
+    completionPercent: 15, sparkline: sparklineRich(15, 9.4, 1, 8, 2), isRescheduled: false,
     rawInput: 'Complete Google STEP internship application before portal closes',
     creditValue: 160, creditsAwarded: false,
     subtasks: [
@@ -379,18 +470,21 @@ function buildTasks(userId) {
     mode: 'normal', createdAt: daysAgo(1), updatedAt: hoursAgo(8),
   });
 
-  // ── T20 · AMBER · CODE · 6 days · Capstone REST API sprint ──────────────
+  // ── T20 · AMBER · CODE · 3 days · Capstone REST API sprint ──────────────
+  // 15% done. remaining = 85% × MEDIUM(3h) = 2.55h ÷ 3d = 0.85h → behind, so 1.2h/day
   ids.t20 = uuidv4();
   tasks.push({
     userId, id: ids.t20,
     taskName: 'Capstone: REST API Final Endpoints + Swagger Docs',
-    deadline: daysFromNow(6), taskType: 'CODE', cognitiveWeight: 'MEDIUM',
+    deadline: daysFromNow(3), taskType: 'CODE', cognitiveWeight: 'MEDIUM',
     selfOwned: true, recipientName: null,
-    currentPaceHoursPerDay: 1.8, status: 'AMBER',
+    currentPaceHoursPerDay: 1.2, status: 'AMBER',
     energyLevel: 'Deep Focus', estimatedDuration: 120,
-    driftExplanation: '15% complete — first endpoint done. 6 endpoints still unimplemented but 6 days is workable. Sprint demo expects a working API — steady 30 min/day keeps this on track.',
+    driftExplanation: '28% complete with only 3 days left — 2 endpoints done, 5 still unimplemented. Sprint demo expects a working API — needs 1.2h/day minimum.',
     hotStartContent: '', negotiatedDraft: '',
-    completionPercent: 15, sparkline: sparkline('up', 20), isRescheduled: false,
+    // velocity=17.0%/d → projectedDays=72/17=4.2d → 1.2d past deadline(3d)
+    // currentPct=28 → maxSafeSpan=27/17=1.59d → sparklineRich uses ~1.35d, 9 pts
+    completionPercent: 28, sparkline: sparklineRich(28, 17.0, 3, 9, 3), isRescheduled: false,
     rawInput: 'Finish remaining REST API endpoints and Swagger docs for capstone sprint demo',
     creditValue: 300, creditsAwarded: false,
     subtasks: [
@@ -719,23 +813,17 @@ function buildCheckIns(userId, tasks) {
   ci.push({ userId, id: uuidv4(), taskId: ids.t5, timestamp: hoursAgo(10),
     selfReportText: 'Tests passing at 50% subtask mark, on track for deadline', selfReportPercent: 50, trustScore: 99 });
 
-  // ── T6 ML Paper (WRITING) — 8 check-ins, stale last 3 days, trust gap 14% ─
+  // ── T6 ML Paper (WRITING) — 5 check-ins over 14 days, last one 2 days ago (stale) ─
   ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(14),
     selfReportText: 'Outlined the paper structure and started abstract. 10%.', selfReportPercent: 10, trustScore: 99 });
-  ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(12),
-    selfReportText: 'Abstract done, intro half-written — about 25%', selfReportPercent: 25, trustScore: 93 });
   ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(10),
-    selfReportText: 'Introduction done. Related work section about 70% through. 35%', selfReportPercent: 35, trustScore: 91 });
-  ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(8),
-    selfReportText: 'Lit review and intro done, methodology outlined — 45%?', selfReportPercent: 45, trustScore: 87 });
+    selfReportText: 'Abstract done, intro half-written — about 18%', selfReportPercent: 18, trustScore: 97 });
   ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(7),
-    selfReportText: 'Methodology section drafted, starting experiments write-up. 48%', selfReportPercent: 48, trustScore: 89 });
-  ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(5),
-    selfReportText: 'Experiments running, results section started. Feeling 60%', selfReportPercent: 60, trustScore: 72 });
+    selfReportText: 'Intro done, related work section drafted — 25%', selfReportPercent: 25, trustScore: 95 });
   ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(4),
-    selfReportText: 'Results tables half-done. Stuck waiting for one experiment run. 58%', selfReportPercent: 58, trustScore: 78 });
-  ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(3),
-    selfReportText: 'Honest: results section barely started, more like 43%. Stopped padding the number.', selfReportPercent: 43, trustScore: 87 });
+    selfReportText: 'Methodology section done, ~33% through. Experiments not started.', selfReportPercent: 33, trustScore: 92 });
+  ci.push({ userId, id: uuidv4(), taskId: ids.t6, timestamp: daysAgo(2),
+    selfReportText: 'Claiming 38% but results section barely touched. Deadline is tomorrow.', selfReportPercent: 38, trustScore: 88 });
 
   // ── T4 Grading (OTHER) — 5 check-ins over 5 days ────────────────────────
   ci.push({ userId, id: uuidv4(), taskId: ids.t4, timestamp: daysAgo(5),

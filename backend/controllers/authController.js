@@ -22,10 +22,14 @@ function getOAuth2Client(redirectUri) {
   const clientId     = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || clientId === 'your_google_client_id_here' || !clientSecret) return null;
+  // Prefer the explicit GOOGLE_REDIRECT_URI env var so it matches Google Console exactly.
+  // Fall back to building from BACKEND_URL (strip any trailing slash to be safe).
+  const backendBase = (process.env.BACKEND_URL || 'http://localhost:3001').replace(/\/$/, '');
+  const defaultUri  = `${backendBase}/api/auth/google/callback`;
   return new google.auth.OAuth2(
     clientId,
     clientSecret,
-    redirectUri || `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/auth/google/callback`
+    redirectUri || process.env.GOOGLE_REDIRECT_URI || defaultUri
   );
 }
 

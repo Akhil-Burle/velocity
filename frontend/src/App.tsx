@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ThemeProvider } from './ThemeContext';
 import { AuthProvider, useAuth, IS_DEMO_MODE } from './AuthContext';
 import { CreditsProvider } from './CreditsContext';
+import { MotionProvider, useMotionPreference } from './MotionContext';
 import { setApiToken } from './api';
 import AppShell from './components/AppShell';
 import Dashboard from './components/Dashboard';
@@ -21,21 +22,31 @@ import { ToastProvider } from './components/Toast';
 import { TourProvider } from './components/TourContext';
 import { Zap } from 'lucide-react';
 
-const pageVariants = {
+const fullPageVariants = {
   initial: { opacity: 0, y: 20, scale: 0.98 },
   animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] } },
   exit:    { opacity: 0, y: -10, scale: 0.97, transition: { duration: 0.3, ease: [0.4, 0, 1, 1] } },
 };
 
-const ShellPage: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <AppShell>
-    <AnimatePresence mode="wait">
-      <motion.div key={window.location.pathname} variants={pageVariants} initial="initial" animate="animate" exit="exit">
-        {children}
-      </motion.div>
-    </AnimatePresence>
-  </AppShell>
-);
+const litePageVariants = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.15 } },
+  exit:    { opacity: 0, transition: { duration: 0.1 } },
+};
+
+const ShellPage: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const reducedMotion = useMotionPreference();
+  const variants = reducedMotion ? litePageVariants : fullPageVariants;
+  return (
+    <AppShell>
+      <AnimatePresence mode="wait">
+        <motion.div key={window.location.pathname} variants={variants} initial="initial" animate="animate" exit="exit">
+          {children}
+        </motion.div>
+      </AnimatePresence>
+    </AppShell>
+  );
+};
 
 // ── Demo splash — shown for ~600ms while auto guest-login resolves ─────────────
 const DemoSplash: React.FC = () => (
@@ -159,17 +170,19 @@ function AppInner() {
 
 function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <CreditsProvider>
-          <ToastProvider>
-            <TourProvider>
-              <AppInner />
-            </TourProvider>
-          </ToastProvider>
-        </CreditsProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <MotionProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <CreditsProvider>
+            <ToastProvider>
+              <TourProvider>
+                <AppInner />
+              </TourProvider>
+            </ToastProvider>
+          </CreditsProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </MotionProvider>
   );
 }
 

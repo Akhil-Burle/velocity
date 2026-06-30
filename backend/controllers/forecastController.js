@@ -32,6 +32,12 @@ const AUTO_LOG_COOLDOWN_MS = 2 * 60 * 60 * 1000; // 2h between autonomous alerts
 const CRITICAL_THRESHOLD = 45;   // below this → agent acts
 const WATCH_THRESHOLD = 65;       // below this → watch
 
+// In-memory fallback cache for drift-alert deduplication when MongoDB is not
+// connected. Prevents the same task from generating a flood of log entries on
+// every forecast call (which can happen on rapid re-renders).
+// Key: `${userId}:${taskId}`, Value: timestamp of last alert.
+const _inMemoryAlertCache = new Map();
+
 // ─── Recovery action generator ────────────────────────────────────────────────
 // Pure deterministic — no AI call needed. The specificity comes from the data.
 
@@ -131,7 +137,10 @@ async function recentAlertExists(userId, taskId) {
       }).lean();
       return !!recent;
     }
-    return false; // in-memory: always allow (no log persistence)
+    // In-memory mode: use local cache for deduplication
+    const key = `${userId}:${taskId}`;
+    const lastAlerted = _inMemoryAlertCache.get(key);
+    return lastAlerted && (Date.now() - lastAlerted) < AUTO_LOG_COOLDOWN_MS;
   } catch {
     return false;
   }
@@ -210,6 +219,9 @@ async function handleForecast(req, res) {
         }).catch(() => null);
 
         if (logEntry) {
+          // Update in-memory cache so subsequent rapid calls are deduplicated
+          // even if MongoDB isn't available yet for the cooldown query.
+          _inMemoryAlertCache.set(`${userId}:${task.id}`, Date.now());
           autonomousActions.push({
             taskId:   task.id,
             taskName: task.taskName,

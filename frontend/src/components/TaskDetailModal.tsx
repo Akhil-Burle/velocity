@@ -10,6 +10,7 @@ import { Task, TaskType, PaceStatus, Subtask } from '../types';
 import PaceChart from './PaceChart';
 import { fmtHours, computePaceMetrics } from '../data';
 import { updateSubtask, editSubtask, addSubtask, deleteSubtask, computeDriftScore, DriftScore } from '../api';
+import { useMotionPreference } from '../MotionContext';
 
 const STATUS_CONFIG: Record<PaceStatus, { accent: string; label: string; glowRgb: string; badgeBg: string; badgeText: string }> = {
   GREEN:   { accent: '#22c55e', label: 'On Pace',     glowRgb: '34,197,94',   badgeBg: 'rgba(34,197,94,0.1)',  badgeText: '#4ade80' },
@@ -172,6 +173,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 }) => {
   const cfg = STATUS_CONFIG[task.status];
   const isComplete = task.status === 'COMPLETE';
+  const reducedMotion = useMotionPreference();
 
   const [subtasks, setSubtasks] = useState<Subtask[]>(task.subtasks ?? []);
   const [ticking, setTicking] = useState<string | null>(null);
@@ -355,9 +357,12 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       onClick={onClose}
     >
       <motion.div
-        initial={{ y: 32, opacity: 0, scale: 0.97 }} animate={{ y: 0, opacity: 1, scale: 1 }}
-        exit={{ y: 20, opacity: 0, scale: 0.97 }}
-        transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+        initial={reducedMotion ? { opacity: 0 } : { y: 32, opacity: 0, scale: 0.97 }}
+        animate={reducedMotion ? { opacity: 1 } : { y: 0, opacity: 1, scale: 1 }}
+        exit={reducedMotion ? { opacity: 0 } : { y: 20, opacity: 0, scale: 0.97 }}
+        transition={reducedMotion
+          ? { duration: 0.15 }
+          : { type: 'spring', stiffness: 320, damping: 32 }}
         className="w-full max-w-6xl flex flex-col rounded-3xl overflow-hidden"
         style={{
           background: modalBg,

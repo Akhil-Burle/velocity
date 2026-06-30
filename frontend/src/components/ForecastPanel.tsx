@@ -11,7 +11,7 @@
  *
  * Runs the forecast on mount and every 5 minutes silently.
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus, AlertTriangle, Zap, RefreshCw, Eye } from 'lucide-react';
 import { runForecast, TaskForecast, ForecastResult } from '../api';
@@ -78,6 +78,13 @@ const ForecastPanel: React.FC<ForecastPanelProps> = ({
   const [expanded, setExpanded] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
+  // Keep callbacks in refs so changes to them never recreate `load` or
+  // restart the polling interval — avoids infinite forecast → re-render loops.
+  const onAutonomousActionRef = useRef(onAutonomousAction);
+  const onHealthUpdateRef = useRef(onHealthUpdate);
+  useEffect(() => { onAutonomousActionRef.current = onAutonomousAction; }, [onAutonomousAction]);
+  useEffect(() => { onHealthUpdateRef.current = onHealthUpdate; }, [onHealthUpdate]);
+
   const load = useCallback(async (silent = false) => {
     if (taskCount === 0) return;
     if (!silent) setLoading(true);
@@ -85,16 +92,16 @@ const ForecastPanel: React.FC<ForecastPanelProps> = ({
       const result = await runForecast();
       setForecast(result);
       setLastRefresh(new Date());
-      onHealthUpdate?.(result.portfolioHealth);
+      onHealthUpdateRef.current?.(result.portfolioHealth);
       if (result.autonomousActions.length > 0) {
-        onAutonomousAction?.();
+        onAutonomousActionRef.current?.();
       }
     } catch {
       // silently fail — forecast is supplementary
     } finally {
       setLoading(false);
     }
-  }, [taskCount, onAutonomousAction]);
+  }, [taskCount]); // ← callbacks removed from deps; taskCount drives re-fetching
 
   // Load on mount, refresh every 5 min silently
   useEffect(() => {

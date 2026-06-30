@@ -331,7 +331,7 @@ cd backend && npm install && npm run dev
 cd frontend && npm install && npm run dev
 ```
 
-App at `http://localhost:5173` · Backend at `http://localhost:3001`
+App at `http://localhost:3000` · Backend at `http://localhost:3001`
 
 ---
 
@@ -346,10 +346,10 @@ App at `http://localhost:5173` · Backend at `http://localhost:3001`
 
 <div align="center">
 
-**Built for the Google AI Hackathon 2026**
+**Built for Vibe2Ship**
 
 [![Live Demo](https://img.shields.io/badge/Try_It_Live-velocity--500511.web.app-22c55e?style=for-the-badge&labelColor=0a0a0f)](https://velocity-500511.web.app)
 
-*Velocity v2.1 · June 2026*
+*Velocity · June 2026*
 
 </div>

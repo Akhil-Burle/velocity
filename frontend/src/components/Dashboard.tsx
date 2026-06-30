@@ -196,6 +196,13 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
   const [forecastHealth, setForecastHealth] = useState<number | null>(null);
   const [pendingDeadlineTasks, setPendingDeadlineTasks] = useState<Task[]>([]);
 
+  // Stable callback for ForecastPanel — must not be an inline arrow or it
+  // recreates on every render, causing ForecastPanel's useEffect to re-fire
+  // and triggering an infinite forecast → agent-log → re-render loop.
+  const handleAutonomousAction = useCallback(() => {
+    addToast({ type: 'info', message: 'Agent logged proactive drift alerts → Agent Log', duration: 5000 });
+  }, [addToast]);
+
   // Pending triage — shows a countdown toast before actually applying the reschedule
   const [pendingTriage, setPendingTriage] = useState<{ taskId: string; taskName: string } | null>(null);
   const prevStatusRef = useRef<Record<string, PaceStatus>>({});
@@ -206,7 +213,7 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
   // ── Search / filter / sort state ─────────────────────────────────────────
   const [searchQuery, setSearchQuery]   = useState('');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'RED' | 'AMBER' | 'GREEN'>('ALL');
-  const [sortBy, setSortBy]             = useState<'deadline' | 'drift' | 'progress' | 'default'>('default');
+  const [sortBy, setSortBy]             = useState<'deadline' | 'drift' | 'progress' | 'default'>('deadline');
   const [sortOpen, setSortOpen]         = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const sortRef = useRef<HTMLDivElement>(null);
@@ -692,10 +699,7 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
             surfaceBorder={surfaceBorder}
             taskCount={activeTasks.length}
             onHealthUpdate={setForecastHealth}
-            onAutonomousAction={() => {
-              // Nudge user toward Agent Log when proactive alerts fire
-              addToast({ type: 'info', message: 'Agent logged proactive drift alerts → Agent Log', duration: 5000 });
-            }}
+            onAutonomousAction={handleAutonomousAction}
           />
         )}
 
@@ -777,12 +781,12 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
                   whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.93 }}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono uppercase tracking-wide"
                   style={{
-                    background: sortBy !== 'default' ? 'rgba(56,189,248,0.1)' : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'),
-                    border: `1px solid ${sortBy !== 'default' ? 'rgba(56,189,248,0.28)' : (isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)')}`,
-                    color: sortBy !== 'default' ? '#38bdf8' : 'var(--text-faint)',
+                    background: sortBy !== 'deadline' ? 'rgba(56,189,248,0.1)' : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'),
+                    border: `1px solid ${sortBy !== 'deadline' ? 'rgba(56,189,248,0.28)' : (isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)')}`,
+                    color: sortBy !== 'deadline' ? '#38bdf8' : 'var(--text-faint)',
                   }}>
                   <ArrowUpDown size={10} />
-                  <span>{sortBy === 'default' ? 'Sort' : sortBy === 'deadline' ? 'Due' : sortBy === 'drift' ? 'Drift' : 'Progress'}</span>
+                  <span>{sortBy === 'deadline' ? 'Due' : sortBy === 'default' ? 'Default' : sortBy === 'drift' ? 'Drift' : 'Progress'}</span>
                 </motion.button>
                 <AnimatePresence>
                   {sortOpen && (
@@ -823,10 +827,10 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
 
               {/* Clear all filters */}
               <AnimatePresence>
-                {(filterStatus !== 'ALL' || sortBy !== 'default' || searchQuery) && (
+                {(filterStatus !== 'ALL' || sortBy !== 'deadline' || searchQuery) && (
                   <motion.button
                     initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
-                    onClick={() => { setFilterStatus('ALL'); setSortBy('default'); setSearchQuery(''); }}
+                    onClick={() => { setFilterStatus('ALL'); setSortBy('deadline'); setSearchQuery(''); }}
                     whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
                     className="w-5 h-5 flex items-center justify-center rounded-full"
                     style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}
@@ -899,9 +903,32 @@ const Dashboard: React.FC<DashboardProps> = ({ brainDumpText }) => {
         <AnimatePresence>
           {rescheduledTasks.length > 0 && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.4 }} className="mt-10">
-              <SectionDivider label="Rescheduled (Triage)" count={rescheduledTasks.length} dimmed accent="#f59e0b" isDark={isDark} />
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+              transition={{ duration: 0.4 }} className="mt-16">
+
+              {/* Heavy visual break between active and rescheduled */}
+              <div className="relative mb-6">
+                {/* Full-width tinted band */}
+                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px"
+                  style={{ background: isDark ? 'rgba(245,158,11,0.18)' : 'rgba(245,158,11,0.22)' }} />
+                {/* Double rule for extra weight */}
+                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 mt-1 h-px"
+                  style={{ background: isDark ? 'rgba(245,158,11,0.07)' : 'rgba(245,158,11,0.1)' }} />
+                {/* Centre label pill */}
+                <div className="relative flex justify-center">
+                  <span className="flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-mono uppercase tracking-widest"
+                    style={{
+                      background: isDark ? '#0d1117' : '#f8fafc',
+                      border: '1px solid rgba(245,158,11,0.28)',
+                      color: '#f59e0b',
+                      boxShadow: isDark ? '0 0 24px rgba(245,158,11,0.08)' : 'none',
+                    }}>
+                    ↓ &nbsp;Rescheduled / Triage&nbsp; · &nbsp;{rescheduledTasks.length}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4"
+                style={{ opacity: 0.72 }}>
                 {rescheduledTasks.map((task, idx) => (
                   <motion.div key={task.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.06, duration: 0.4 }}>

@@ -108,6 +108,7 @@ const BrainDumpInput = forwardRef<BrainDumpInputHandle, BrainDumpInputProps>(({
     e.preventDefault();
     if (!value.trim() || loading) return;
     onSubmit(value.trim());
+    setValue('');
   };
 
   // ── Compact camera (file picker for image scan) ────────────────────────────
@@ -123,6 +124,7 @@ const BrainDumpInput = forwardRef<BrainDumpInputHandle, BrainDumpInputProps>(({
         const base64 = (ev.target?.result as string).replace(/^data:[^;]+;base64,/, '');
         const tasks = await scanImageForTasks(base64, file.type || 'image/jpeg');
         onTasksExtracted(tasks);
+        setValue('');
       } catch {
         // silently fail in compact mode
       }

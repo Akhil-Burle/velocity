@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { TaskType, CognitiveWeight, EnergyLevel } from '../types';
 import { createTaskManual } from '../api';
+import DateTimePicker from './DateTimePicker';
 
 interface NewSubtask { title: string; estimatedMinutes: number }
 
@@ -224,10 +225,13 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isDark = true, onClos
 
           {/* ── Deadline ── */}
           {field('Deadline', true, errors.deadline,
-            <input type="datetime-local" value={deadline} min={todayStr()}
-              onChange={e => setDeadline(e.target.value)}
-              className={inputClass} style={{ ...inputStyle,
-                border: `1px solid ${errors.deadline ? '#ef4444' : inputBdr}` }} />
+            <DateTimePicker
+              value={deadline}
+              onChange={v => setDeadline(v)}
+              isDark={isDark}
+              error={!!errors.deadline}
+              minDate={new Date()}
+            />
           )}
 
           {/* ── Task type ── */}
